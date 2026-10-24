@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Messages — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Messages</h1>
+</div>
+<div class="filters">
+  <a href="{{ url_for('messages_list') }}" class="{{ 'active' if not filter_status and not filter_channel else '' }}">All</a>
+  <a href="{{ url_for('messages_list', status='draft') }}" class="{{ 'active' if filter_status == 'draft' else '' }}">Drafts</a>
+  <a href="{{ url_for('messages_list', status='sent') }}" class="{{ 'active' if filter_status == 'sent' else '' }}">Sent</a>
+  <a href="{{ url_for('messages_list', status='failed') }}" class="{{ 'active' if filter_status == 'failed' else '' }}">Failed</a>
+  <a href="{{ url_for('messages_list', channel='sms') }}" class="{{ 'active' if filter_channel == 'sms' else '' }}">SMS</a>
+  <a href="{{ url_for('messages_list', channel='email') }}" class="{{ 'active' if filter_channel == 'email' else '' }}">Email</a>
+</div>
+<div class="card">
+  {% if messages %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Channel</th>
+          <th>To</th>
+          <th>Contractor</th>
+          <th>Subject / preview</th>
+          <th>Status</th>
+          <th>By</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in messages %}
+        <tr>
+          <td><a href="{{ url_for('message_detail', mid=m.id) }}">#{{ m.id }}</a></td>
+          <td><span class="badge">{{ m.channel }}</span></td>
+          <td>{{ m.to_address }}</td>
+          <td><a href="{{ url_for('contractor_detail', cid=m.contractor_id) }}">{{ m.company_name }}</a></td>
+          <td>{{ m.subject or (m.body[:60] ~ ('…' if m.body|length > 60 else '')) }}</td>
+          <td><span class="badge badge-{{ 'delivered' if m.status == 'sent' else ('cancelled' if m.status == 'failed' else 'quoted') }}">{{ m.status }}</span></td>
+          <td class="muted">{{ m.created_by_name or '—' }}</td>
+          <td class="muted">{{ m.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No messages yet. Draft an SMS from a contractor or job, or email an invoice from a job.</p>
+  {% endif %}
+</div>
+{% endblock %}

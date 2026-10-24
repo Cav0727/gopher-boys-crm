@@ -1,0 +1,133 @@
+# Gopher Boys CRM
+
+Internal web CRM for **Gopher Boys** — construction materials pickup & delivery (Coastal Georgia / Pooler).
+
+**Slogan:** WE PICK UP. YOU KEEP BUILDING.
+
+## Stack
+
+- Python 3 + Flask
+- SQLite (`DATABASE_PATH`, default `data/gopher.db`)
+- Jinja2 templates + vanilla CSS
+- Multi-user login (admin / staff)
+- Message drafts for SMS + invoice email (manual or Twilio/SMTP when configured)
+- Gunicorn for production hosting
+
+## Quick start (local)
+
+```bash
+cd /workspace/gopher-boys-crm
+./start.sh
+```
+
+Or manually:
+
+```bash
+cd /workspace/gopher-boys-crm
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+PORT=5055 ./venv/bin/python app.py
+```
+
+Open: **http://127.0.0.1:5055**
+
+## Default logins (change immediately)
+
+On first boot (empty `users` table), two accounts are seeded with the same password:
+
+| Role  | Email | Name | Default password |
+|-------|-------|------|------------------|
+| admin | `chris@ridgewayroofingco.com` | Chris Vincent | `ChangeMeNow!` (or `ADMIN_PASSWORD` env) |
+| staff | `mack@ridgewayroofingco.com` | Mack Ridgeway | same as above |
+
+**You must change these passwords** after first login (Users → Edit, or set a strong `ADMIN_PASSWORD` before first boot so the seed uses it).
+
+## Environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SECRET_KEY` | Yes in prod | Flask session signing. Fallback local-only key exists for dev. |
+| `ADMIN_PASSWORD` | Recommended | Password for seeded Chris/Mack accounts on first boot. |
+| `DATABASE_PATH` | Optional | SQLite file path. Default: `data/gopher.db`. On Render disk use `/var/data/gopher.db`. |
+| `PORT` | Optional | Listen port. Default `5055` locally; hosts set `$PORT`. |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | Optional | If all set, SMS drafts show a **Send via Twilio** button. |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Optional | If set, email drafts can Send via SMTP (`SMTP_PORT` default 587). |
+| `RESEND_API_KEY` | Optional | Alternative to SMTP for sending invoice emails. |
+
+## Multi-user accounts
+
+- Routes: `/login`, `/logout`, `/users` (admin), `/users/new`, `/users/<id>/edit`
+- Roles: `admin` (manage users) · `staff` (full CRM, no user admin)
+- All app routes require login except `/login`, `/static/*`, and `/health`
+- Jobs and contractors are **shared** company-wide (not per-user silos)
+- Activity notes record which user wrote them when available
+
+Admins create users at **Users → New user**.
+
+
+## Drivers & dispatch
+
+- `/drivers` — list / add / edit delivery drivers (name, phone, active, notes)
+- Jobs have optional **assigned driver** + **materials** (what to pick up)
+- On job detail: assign driver, then **Text driver next stop** → SMS draft with supplier, materials, jobsite, miles from Pooler 31322, quote, customer phone
+- Dashboard shows **Next up** (soonest scheduled job per active driver)
+- Same draft-first / Mark sent / Twilio Send rules as customer SMS
+
+## Messaging (SMS + invoices)
+
+- **Text customer** on contractor detail and job detail → saves an SMS **draft** in `messages`
+- **Email invoice** on job detail → builds quote + wait fee invoice → email **draft**
+- `/messages` lists all drafts/sent/failed
+- Message detail: **Mark sent** (after you text/email manually), **Copy**, **mailto:** link
+- Live **Send** only appears when Twilio / SMTP / Resend env vars are configured
+- **Never auto-sends** — Chris must click Send (or Mark sent) for every customer contact
+
+## Features
+
+- Dashboard with status counts, recent jobs, quick quote widget
+- Contractors: list / add / edit / detail (+ their jobs)
+- Jobs pipeline with status filters and auto-quote from flyer rates
+- Job detail: status buttons, notes, activity timeline, SMS + invoice drafts
+- Quote calculator + rate card
+- Search (name, phone, address, order #)
+- CSV export for contractors and jobs
+- Health check: `GET /health` → `200 ok`
+
+## Pricing (from flyer)
+
+| Miles | Price |
+|------:|------:|
+| ≤ 10  | $110  |
+| 15    | $125  |
+| 20    | $140  |
+| 25    | $155  |
+| 30    | $170  |
+| > 30  | Custom quote |
+
+Formula: first 10 miles = $110, then **$3/mi**. Wait: first 15 min included, then **$20 per started 15 min**.
+
+## Deploy on Render
+
+1. Push this repo to GitHub (or connect the folder).
+2. In Render: **New → Blueprint** and select `render.yaml`, **or** New Web Service:
+   - Runtime: Python
+   - Build: `pip install -r requirements.txt`
+   - Start: `gunicorn app:app --bind 0.0.0.0:$PORT`
+3. Add a **persistent disk** mounted at `/var/data` (so SQLite survives deploys).
+4. Set env vars:
+   - `SECRET_KEY` — strong random string
+   - `ADMIN_PASSWORD` — strong password (used only on first boot seed)
+   - `DATABASE_PATH=/var/data/gopher.db`
+5. Optional later: Twilio + SMTP/Resend for live Send buttons.
+6. Open the Render URL → log in as Chris → **change passwords** under Users.
+
+`from app import app` works for Gunicorn (`app:app` in Procfile).
+
+## Seed data
+
+- Contractor: **Ridgeway Roofing Co.** / Mack Ridgeway / (912) 777-2339
+- Users: Chris (admin) + Mack (staff) as above
+
+## Contact
+
+Request a pickup: **Mack Ridgeway** — (912) 777-2339 · Pooler, GA 31322

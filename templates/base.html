@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Gopher Boys CRM{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
+      <div class="brand-text">
+        <strong>GOPHER BOYS</strong>
+        <span>{{ SLOGAN }}</span>
+      </div>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a>
+      <a href="{{ url_for('jobs_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('job') else '' }}">Jobs</a>
+      <a href="{{ url_for('contractors_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('contractor') else '' }}">Contractors</a>
+      <a href="{{ url_for('drivers_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('driver') else '' }}">Drivers</a>
+      <a href="{{ url_for('messages_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('message') else '' }}">Messages</a>
+      <a href="{{ url_for('quote_page') }}" class="{{ 'active' if request.endpoint == 'quote_page' else '' }}">Quote</a>
+      <a href="{{ url_for('rates') }}" class="{{ 'active' if request.endpoint == 'rates' else '' }}">Rates</a>
+      {% if current_user and current_user.role == 'admin' %}
+      <a href="{{ url_for('users_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('user') else '' }}">Users</a>
+      {% endif %}
+    </nav>
+    <form class="search-form" action="{{ url_for('search') }}" method="get">
+      <input type="search" name="q" placeholder="Search…" value="{{ request.args.get('q','') }}" aria-label="Search">
+      <button class="btn btn-sm" type="submit">Go</button>
+    </form>
+    {% if current_user %}
+    <div class="user-chip">
+      <span>{{ current_user.name }}</span>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+    {% endif %}
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer-bar">
+    Based in <strong>{{ SERVICE_AREA }}</strong> ·
+    Request a pickup: contact <strong>{{ CONTACT_NAME }}</strong> —
+    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+    · Price &amp; delivery timing confirmed before dispatch.
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

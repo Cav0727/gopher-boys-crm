@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Users — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Users</h1>
+  <div class="btn-group">
+    <a class="btn btn-mint" href="{{ url_for('user_new') }}">New user</a>
+  </div>
+</div>
+<div class="card">
+  {% if users %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><strong>{{ u.name }}</strong></td>
+        <td>{{ u.email }}</td>
+        <td><span class="badge">{{ u.role }}</span></td>
+        <td>{% if u.is_active %}<span class="badge badge-delivered">Active</span>{% else %}<span class="badge badge-cancelled">Inactive</span>{% endif %}</td>
+        <td class="muted">{{ u.created_at }}</td>
+        <td><a href="{{ url_for('user_edit', uid=u.id) }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No users yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

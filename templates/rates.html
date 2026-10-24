@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Rate Card — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Rate card</h1>
+  <a class="btn" href="{{ url_for('quote_page') }}">Open calculator</a>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:1.25rem">
+  <div class="card">
+    <img src="{{ url_for('static', filename='img/flyer.png') }}" alt="Gopher Boys flyer"
+         style="width:100%;border-radius:8px;border:1px solid var(--border)">
+  </div>
+  <div>
+    <div class="mint-box" style="margin-bottom:1rem">
+      <strong>POTENTIAL MONTHLY SAVINGS</strong>
+      <div class="big">$4,207</div>
+      <div class="pitch">
+        <div><span class="val">$7,287</span>Employee + truck / mo</div>
+        <div><span class="val">$3,080</span>Gopher Boys / mo</div>
+      </div>
+      <p class="hint" style="margin:0.5rem 0 0">Example: replacing a dedicated $30/hour runner and truck.</p>
+    </div>
+
+    <div class="card">
+      <h2>Pooler, GA 31322 supplier → jobsite</h2>
+      <div class="table-wrap">
+        <table class="rate-table">
+          <thead><tr><th>Distance</th><th>Price</th></tr></thead>
+          <tbody>
+            {% for miles, price in rate_table %}
+            <tr>
+              <td>{% if miles == 10 %}Up to 10 miles{% else %}{{ miles }} miles{% endif %}</td>
+              <td><strong>${{ price }}</strong></td>
+            </tr>
+            {% endfor %}
+            <tr><td>Over 30 miles</td><td>Custom quote</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">First 10 miles included. Then $3 per mile. Pricing is one-way road miles.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Terms</h2>
+  <ul>
+    <li>Includes <strong>one pickup</strong> and <strong>one ground-level delivery</strong>.</li>
+    <li>Materials must be <strong>ready upon arrival</strong>.</li>
+    <li>First <strong>15 minutes</strong> of combined loading, unloading, and waiting are included.</li>
+    <li>After the first 15 minutes: <strong>$20 per started 15 minutes</strong>.</li>
+    <li><strong>Extra stops</strong> are quoted separately.</li>
+    <li>Materials: plywood, shingles, nails, small supplies.</li>
+  </ul>
+  <h3>How it works</h3>
+  <ol>
+    <li>Order and pay your supplier.</li>
+    <li>Send us the order number and job address.</li>
+    <li>We confirm the price and deliver.</li>
+  </ol>
+  <p><strong>Request a pickup:</strong> contact {{ CONTACT_NAME }} —
+    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>.
+    Price and delivery timing confirmed before dispatch.</p>
+</div>
+{% endblock %}

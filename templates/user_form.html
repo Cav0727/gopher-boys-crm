@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{% if user %}Edit{% else %}New{% endif %} User — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{% if user %}Edit user{% else %}New user{% endif %}</h1>
+</div>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      {% if not user %}
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" required value="{{ form.get('email','') }}">
+      </div>
+      {% else %}
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" value="{{ user.email }}" disabled>
+      </div>
+      {% endif %}
+      <div class="form-group">
+        <label for="name">Name *</label>
+        <input id="name" name="name" required value="{{ form.get('name','') }}">
+      </div>
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role">
+          <option value="staff" {% if form.get('role') == 'staff' %}selected{% endif %}>Staff</option>
+          <option value="admin" {% if form.get('role') == 'admin' %}selected{% endif %}>Admin</option>
+        </select>
+      </div>
+      {% if user %}
+      <div class="form-group">
+        <label for="is_active">Active</label>
+        <select id="is_active" name="is_active">
+          <option value="1" {% if form.get('is_active') in (1, '1', True) %}selected{% endif %}>Active</option>
+          <option value="0" {% if form.get('is_active') in (0, '0', False) %}selected{% endif %}>Inactive</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="form-group full">
+        <label for="password">{% if user %}New password (leave blank to keep){% else %}Password *{% endif %}</label>
+        <input id="password" name="password" type="password" {% if not user %}required{% endif %} autocomplete="new-password">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save</button>
+      <a class="btn btn-outline" href="{{ url_for('users_list') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

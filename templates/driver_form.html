@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{% if driver %}Edit{% else %}New{% endif %} Driver — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{% if driver %}Edit driver{% else %}New driver{% endif %}</h1>
+</div>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="name">Name *</label>
+        <input id="name" name="name" required value="{{ form.get('name','') }}">
+      </div>
+      <div class="form-group">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" type="tel" value="{{ form.get('phone','') }}">
+      </div>
+      {% if driver %}
+      <div class="form-group">
+        <label for="is_active">Status</label>
+        <select id="is_active" name="is_active">
+          <option value="1" {% if form.get('is_active') in (1, '1', True) %}selected{% endif %}>Active</option>
+          <option value="0" {% if form.get('is_active') in (0, '0', False) %}selected{% endif %}>Inactive</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="form-group full">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes">{{ form.get('notes','') }}</textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save</button>
+      <a class="btn btn-outline" href="{{ url_for('drivers_list') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

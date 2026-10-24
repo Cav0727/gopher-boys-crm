@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <div class="btn-group">
+    <a class="btn" href="{{ url_for('job_new') }}">+ New Job</a>
+    <a class="btn btn-secondary" href="{{ url_for('contractor_new') }}">+ Contractor</a>
+  </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:1.25rem">
+  <div class="card stat">
+    <span class="num">{{ total }}</span>
+    <span class="lbl">Total Jobs</span>
+  </div>
+  <div class="card stat">
+    <span class="num">{{ open_jobs }}</span>
+    <span class="lbl">Open Pipeline</span>
+  </div>
+  <div class="card stat">
+    <span class="num">{{ contractor_count }}</span>
+    <span class="lbl">Contractors</span>
+  </div>
+  <div class="card stat mint">
+    <span class="num">${{ '%.0f'|format(revenue or 0) }}</span>
+    <span class="lbl">Delivered / Invoiced</span>
+  </div>
+</div>
+
+
+{% if next_up %}
+<div class="card" style="margin-bottom:1.25rem">
+  <h2>Next up (drivers)</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Driver</th><th>Phone</th><th>Next scheduled job</th><th>Customer</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        {% for row in next_up %}
+        <tr>
+          <td><strong>{{ row.driver_name }}</strong></td>
+          <td>{% if row.driver_phone %}<a href="tel:{{ row.driver_phone }}">{{ row.driver_phone }}</a>{% else %}—{% endif %}</td>
+          <td>
+            {% if row.job_id %}
+              <a href="{{ url_for('job_detail', jid=row.job_id) }}">#{{ row.job_id }}</a>
+              — {{ row.job_address or '—' }}{% if row.city %}, {{ row.city }}{% endif %}
+            {% else %}
+              <span class="muted">No scheduled job</span>
+            {% endif %}
+          </td>
+          <td>{{ row.company_name or '—' }}</td>
+          <td class="muted">{{ row.scheduled_at or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-2" style="margin-bottom:1.25rem">
+  <div class="card">
+    <h2>Pipeline by status</h2>
+    <div class="grid grid-3">
+      {% for s in STATUSES %}
+      <div class="stat">
+        <a href="{{ url_for('jobs_list', status=s) }}">
+          <span class="num">{{ counts.get(s, 0) }}</span>
+          <span class="lbl"><span class="badge badge-{{ s }}">{{ status_label(s) }}</span></span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quick quote</h2>
+    <p class="hint">Pooler, GA 31322 supplier → jobsite · first 10 mi = $110 · then $3/mi · over 30 = custom</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="dash-miles">One-way miles</label>
+        <input type="number" id="dash-miles" min="0" step="0.1" placeholder="e.g. 18">
+      </div>
+      <div class="form-group">
+        <label for="dash-wait">Extra wait (min beyond 15)</label>
+        <input type="number" id="dash-wait" min="0" step="1" value="0">
+      </div>
+    </div>
+    <div id="dash-quote" class="quote-result" style="display:none">
+      <div class="price" id="dash-price"></div>
+      <div class="hint" id="dash-detail"></div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-mint" id="dash-calc">Calculate</button>
+      <a class="btn btn-outline" href="{{ url_for('quote_page') }}">Full calculator</a>
+    </div>
+  </div>
+</div>
+
+<div class="mint-box" style="margin-bottom:1.25rem">
+  <strong>POTENTIAL MONTHLY SAVINGS</strong>
+  <div class="big">$4,207</div>
+  <div class="pitch">
+    <div><span class="val">$7,287/mo</span>Employee + truck</div>
+    <div><span class="val">$3,080/mo</span>Gopher Boys</div>
+    <div><span class="val">$4,207/mo</span>You keep building</div>
+  </div>
+  <p class="hint" style="margin:0.75rem 0 0">Example: replacing a dedicated $30/hour runner and truck.</p>
+</div>
+
+<div class="card">
+  <div class="page-header" style="margin-bottom:0.5rem">
+    <h2 style="margin:0">Recent jobs</h2>
+    <a href="{{ url_for('jobs_list') }}">View all →</a>
+  </div>
+  {% if recent %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Contractor</th><th>Address</th><th>Miles</th><th>Quote</th><th>Status</th><th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in recent %}
+        <tr>
+          <td><a href="{{ url_for('job_detail', jid=j.id) }}">#{{ j.id }}</a></td>
+          <td>{{ j.company_name }}</td>
+          <td>{{ j.job_address or '—' }}{% if j.city %}, {{ j.city }}{% endif %}</td>
+          <td>{% if j.miles is not none %}{{ '%.1f'|format(j.miles) }}{% else %}—{% endif %}</td>
+          <td>
+            {% if j.quote_amount is not none %}${{ '%.2f'|format(j.quote_amount) }}
+            {% elif j.miles is not none and j.miles > 30 %}<span class="badge badge-custom">Custom</span>
+            {% else %}—{% endif %}
+          </td>
+          <td><span class="badge badge-{{ j.status }}">{{ status_label(j.status) }}</span></td>
+          <td class="muted">{{ j.updated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No jobs yet. <a href="{{ url_for('job_new') }}">Create the first delivery</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function calcDash() {
+  const miles = document.getElementById('dash-miles').value;
+  const wait = document.getElementById('dash-wait').value || 0;
+  const box = document.getElementById('dash-quote');
+  const price = document.getElementById('dash-price');
+  const detail = document.getElementById('dash-detail');
+  if (miles === '' || miles === null) { box.style.display='none'; return; }
+  const r = await fetch(`/api/quote?miles=${encodeURIComponent(miles)}&wait_extra=${encodeURIComponent(wait)}`);
+  const data = await r.json();
+  box.style.display = 'block';
+  if (data.delivery.custom) {
+    price.textContent = 'Custom quote';
+    detail.textContent = data.delivery.detail;
+  } else if (data.delivery.ok) {
+    const total = data.total != null ? data.total : data.delivery.amount;
+    price.textContent = '$' + Number(total).toFixed(2);
+    detail.textContent = data.delivery.detail + (data.wait.fee ? ' · ' + data.wait.detail : '');
+  } else {
+    price.textContent = data.delivery.label;
+    detail.textContent = data.delivery.detail || '';
+  }
+}
+document.getElementById('dash-calc').addEventListener('click', calcDash);
+document.getElementById('dash-miles').addEventListener('change', calcDash);
+</script>
+{% endblock %}

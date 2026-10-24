@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Jobs pipeline</h1>
+  <div class="btn-group">
+    <a class="btn" href="{{ url_for('job_new') }}">+ New Job</a>
+    <a class="btn btn-outline" href="{{ url_for('export_jobs') }}">Export CSV</a>
+  </div>
+</div>
+
+<div class="filters">
+  <a href="{{ url_for('jobs_list') }}" class="{{ 'active' if not filter_status else '' }}">All</a>
+  {% for s in STATUSES %}
+  <a href="{{ url_for('jobs_list', status=s) }}" class="{{ 'active' if filter_status == s else '' }}">{{ status_label(s) }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  {% if jobs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Contractor</th><th>Supplier / Order</th><th>Jobsite</th>
+          <th>Miles</th><th>Quote</th><th>Wait fee</th><th>Status</th><th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in jobs %}
+        <tr>
+          <td><a href="{{ url_for('job_detail', jid=j.id) }}"><strong>#{{ j.id }}</strong></a></td>
+          <td>{{ j.company_name }}</td>
+          <td>
+            {{ j.supplier or '—' }}
+            {% if j.order_ref %}<br><span class="muted">#{{ j.order_ref }}</span>{% endif %}
+          </td>
+          <td>{{ j.job_address or '—' }}{% if j.city %}<br><span class="muted">{{ j.city }}</span>{% endif %}</td>
+          <td>{% if j.miles is not none %}{{ '%.1f'|format(j.miles) }}{% else %}—{% endif %}</td>
+          <td>
+            {% if j.quote_amount is not none %}${{ '%.2f'|format(j.quote_amount) }}
+            {% elif j.miles is not none and j.miles > 30 %}<span class="badge badge-custom">Custom</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>{% if j.wait_fee %}{{ '%.2f'|format(j.wait_fee) }}{% else %}—{% endif %}</td>
+          <td><span class="badge badge-{{ j.status }}">{{ status_label(j.status) }}</span></td>
+          <td class="muted">{{ j.updated_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No jobs{% if filter_status %} with status “{{ status_label(filter_status) }}”{% endif %}.</p>
+  {% endif %}
+</div>
+{% endblock %}

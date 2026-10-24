@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Message #{{ msg.id }} — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Message #{{ msg.id }}
+    <span class="badge">{{ msg.channel }}</span>
+    <span class="badge badge-{{ 'delivered' if msg.status == 'sent' else ('cancelled' if msg.status == 'failed' else 'quoted') }}">{{ msg.status }}</span>
+  </h1>
+  <div class="btn-group">
+    <a class="btn btn-outline" href="{{ url_for('messages_list') }}">All messages</a>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:1.25rem">
+  <div class="card">
+    <h2>Details</h2>
+    <dl>
+      <div class="dl-row"><dt>Contractor</dt>
+        <dd><a href="{{ url_for('contractor_detail', cid=msg.contractor_id) }}">{{ msg.company_name }}</a>
+          {% if msg.contact_name %} · {{ msg.contact_name }}{% endif %}
+        </dd>
+      </div>
+      {% if msg.job_id %}
+      <div class="dl-row"><dt>Job</dt><dd><a href="{{ url_for('job_detail', jid=msg.job_id) }}">#{{ msg.job_id }}</a></dd></div>
+      {% endif %}
+      <div class="dl-row"><dt>To</dt><dd>{{ msg.to_address }}</dd></div>
+      {% if msg.subject %}
+      <div class="dl-row"><dt>Subject</dt><dd>{{ msg.subject }}</dd></div>
+      {% endif %}
+      <div class="dl-row"><dt>Created</dt><dd class="muted">{{ msg.created_at }}{% if msg.created_by_name %} · {{ msg.created_by_name }}{% endif %}</dd></div>
+      {% if msg.sent_at %}
+      <div class="dl-row"><dt>Sent</dt><dd class="muted">{{ msg.sent_at }}</dd></div>
+      {% endif %}
+    </dl>
+  </div>
+  <div class="card">
+    <h2>Actions</h2>
+    <p class="hint">Nothing is sent unless you click an explicit Send or Mark sent. Chris approves customer contact.</p>
+    <div class="btn-group" style="flex-wrap:wrap;gap:0.5rem">
+      {% if msg.status != 'sent' %}
+      <form method="post" action="{{ url_for('message_mark_sent', mid=msg.id) }}">
+        <button class="btn btn-secondary" type="submit">Mark sent</button>
+      </form>
+      {% endif %}
+      {% if msg.channel == 'sms' %}
+        {% if twilio_ready and msg.status != 'sent' %}
+        <form method="post" action="{{ url_for('message_send', mid=msg.id) }}" onsubmit="return confirm('Send this SMS via Twilio now?');">
+          <button class="btn btn-mint" type="submit">Send via Twilio</button>
+        </form>
+        {% else %}
+        <button class="btn btn-outline" type="button" id="copy-sms">Copy message</button>
+        {% endif %}
+      {% elif msg.channel == 'email' %}
+        {% if email_ready and msg.status != 'sent' %}
+        <form method="post" action="{{ url_for('message_send', mid=msg.id) }}" onsubmit="return confirm('Send this email now?');">
+          <button class="btn btn-mint" type="submit">Send email</button>
+        </form>
+        {% endif %}
+        {% if mailto %}
+        <a class="btn btn-outline" href="{{ mailto }}">Open mailto…</a>
+        {% endif %}
+        <button class="btn btn-outline" type="button" id="copy-email">Copy body</button>
+      {% endif %}
+    </div>
+    {% if msg.channel == 'sms' and not twilio_ready %}
+    <p class="muted" style="margin-top:0.75rem;font-size:0.85rem">Twilio not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM). Copy and send from your phone, then Mark sent.</p>
+    {% endif %}
+    {% if msg.channel == 'email' and not email_ready %}
+    <p class="muted" style="margin-top:0.75rem;font-size:0.85rem">Email not configured (set SMTP_* or RESEND_API_KEY). Use mailto or copy, then Mark sent.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Body</h2>
+  <pre class="message-body" id="message-body">{{ msg.body }}</pre>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const body = document.getElementById('message-body');
+  function copy() {
+    navigator.clipboard.writeText(body.textContent).then(function(){
+      alert('Copied to clipboard');
+    });
+  }
+  const a = document.getElementById('copy-sms');
+  const b = document.getElementById('copy-email');
+  if (a) a.addEventListener('click', copy);
+  if (b) b.addEventListener('click', copy);
+})();
+</script>
+{% endblock %}

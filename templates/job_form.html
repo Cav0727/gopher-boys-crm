@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}{% if job %}Edit Job #{{ job.id }}{% else %}New Job{% endif %} — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{% if job %}Edit job #{{ job.id }}{% else %}New job{% endif %}</h1>
+</div>
+
+<div class="card" style="margin-bottom:1rem">
+  <p class="hint" style="margin:0">
+    Flow: (1) Customer orders &amp; pays supplier → (2) Send order # + job address → (3) Confirm price &amp; deliver.
+    Includes one pickup + one ground-level delivery. Materials must be ready on arrival.
+  </p>
+</div>
+
+<div class="card">
+  <form method="post" id="job-form">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="contractor_id">Contractor *</label>
+        <select id="contractor_id" name="contractor_id" required>
+          <option value="">Select…</option>
+          {% for c in contractors %}
+          <option value="{{ c.id }}"
+            {% if form.get('contractor_id')|string == c.id|string or (not form.get('contractor_id') and preselect == c.id) %}selected{% endif %}>
+            {{ c.company_name }}{% if c.contact_name %} ({{ c.contact_name }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for s in STATUSES %}
+          <option value="{{ s }}" {% if (form.get('status') or 'lead') == s %}selected{% endif %}>{{ status_label(s) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="supplier">Supplier</label>
+        <input id="supplier" name="supplier" placeholder="e.g. Pooler, GA 31322 lumber yard" value="{{ form.get('supplier','') }}">
+      </div>
+      <div class="form-group">
+        <label for="order_ref">Order #</label>
+        <input id="order_ref" name="order_ref" value="{{ form.get('order_ref','') }}">
+      </div>
+
+      <div class="form-group full">
+        <label for="materials">Materials to pick up</label>
+        <textarea id="materials" name="materials" placeholder="e.g. plywood, shingles, nails, order notes">{{ form.get('materials','') }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="driver_id">Assigned driver</label>
+        <select id="driver_id" name="driver_id">
+          <option value="">— Unassigned —</option>
+          {% for d in drivers or [] %}
+          <option value="{{ d.id }}"
+            {% if form.get('driver_id')|string == d.id|string %}selected{% endif %}>
+            {{ d.name }}{% if d.phone %} ({{ d.phone }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group full">
+        <label for="job_address">Job address</label>
+        <input id="job_address" name="job_address" value="{{ form.get('job_address','') }}">
+      </div>
+      <div class="form-group">
+        <label for="city">City</label>
+        <input id="city" name="city" placeholder="Pooler, GA 31322" value="{{ form.get('city','') }}">
+      </div>
+      <div class="form-group">
+        <label for="miles">One-way road miles</label>
+        <input id="miles" name="miles" type="number" min="0" step="0.1" value="{{ form.get('miles','') }}">
+        <span class="hint" id="miles-hint"></span>
+      </div>
+      <div class="form-group">
+        <label for="quote_amount">Quote amount ($)</label>
+        <input id="quote_amount" name="quote_amount" type="number" min="0" step="0.01" value="{{ form.get('quote_amount','') }}">
+        <div class="check-row">
+          <input type="checkbox" id="manual_quote" name="manual_quote" value="1">
+          <label for="manual_quote">Keep manual override (don’t auto-recalc)</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="wait_minutes_extra">Extra wait minutes (beyond 15)</label>
+        <input id="wait_minutes_extra" name="wait_minutes_extra" type="number" min="0" step="1" value="{{ form.get('wait_minutes_extra') or 0 }}">
+        <span class="hint">$20 per started 15 min after first 15 included</span>
+      </div>
+      <div class="form-group">
+        <label for="scheduled_at">Scheduled at</label>
+        <input id="scheduled_at" name="scheduled_at" placeholder="YYYY-MM-DD HH:MM" value="{{ form.get('scheduled_at') or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="delivered_at">Delivered at</label>
+        <input id="delivered_at" name="delivered_at" placeholder="YYYY-MM-DD HH:MM" value="{{ form.get('delivered_at') or '' }}">
+      </div>
+      <div class="form-group full">
+        <label for="extra_stops_notes">Extra stops (quoted separately)</label>
+        <textarea id="extra_stops_notes" name="extra_stops_notes">{{ form.get('extra_stops_notes','') }}</textarea>
+      </div>
+      <div class="form-group full">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes">{{ form.get('notes','') }}</textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save job</button>
+      <a class="btn btn-outline" href="{% if job %}{{ url_for('job_detail', jid=job.id) }}{% else %}{{ url_for('jobs_list') }}{% endif %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const milesEl = document.getElementById('miles');
+const quoteEl = document.getElementById('quote_amount');
+const manualEl = document.getElementById('manual_quote');
+const hintEl = document.getElementById('miles-hint');
+
+async function autoQuote() {
+  if (manualEl.checked) return;
+  const miles = milesEl.value;
+  if (miles === '') { hintEl.textContent = ''; return; }
+  const r = await fetch(`/api/quote?miles=${encodeURIComponent(miles)}`);
+  const data = await r.json();
+  if (data.delivery.custom) {
+    hintEl.innerHTML = '<span class="badge badge-custom">Custom quote</span> ' + data.delivery.detail;
+    // leave quote blank for custom unless already set
+  } else if (data.delivery.ok) {
+    quoteEl.value = data.delivery.amount.toFixed(2);
+    hintEl.textContent = data.delivery.detail;
+  } else {
+    hintEl.textContent = data.delivery.label;
+  }
+}
+milesEl.addEventListener('change', autoQuote);
+milesEl.addEventListener('blur', autoQuote);
+if (milesEl.value && !manualEl.checked && !quoteEl.value) autoQuote();
+</script>
+{% endblock %}

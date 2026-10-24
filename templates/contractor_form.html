@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{% if contractor %}Edit{% else %}New{% endif %} Contractor — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{% if contractor %}Edit contractor{% else %}New contractor{% endif %}</h1>
+</div>
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="company_name">Company name *</label>
+        <input id="company_name" name="company_name" required value="{{ form.get('company_name','') }}">
+      </div>
+      <div class="form-group">
+        <label for="contact_name">Contact name</label>
+        <input id="contact_name" name="contact_name" value="{{ form.get('contact_name','') }}">
+      </div>
+      <div class="form-group">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" type="tel" value="{{ form.get('phone','') }}">
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" value="{{ form.get('email','') }}">
+      </div>
+      <div class="form-group full">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes">{{ form.get('notes','') }}</textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save</button>
+      <a class="btn btn-outline" href="{% if contractor %}{{ url_for('contractor_detail', cid=contractor.id) }}{% else %}{{ url_for('contractors_list') }}{% endif %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }} — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Job #{{ job.id }}
+    <span class="badge badge-{{ job.status }}">{{ status_label(job.status) }}</span>
+  </h1>
+  <div class="btn-group">
+    <a class="btn btn-secondary" href="{{ url_for('job_edit', jid=job.id) }}">Edit</a>
+    <a class="btn btn-outline" href="{{ url_for('jobs_list') }}">Back</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem">
+  <h2>Update status</h2>
+  <div class="btn-group">
+    {% for s in STATUSES %}
+    <form method="post" action="{{ url_for('job_status', jid=job.id) }}" style="display:inline">
+      <input type="hidden" name="status" value="{{ s }}">
+      <button type="submit" class="btn btn-sm {% if job.status == s %}btn-mint{% else %}btn-outline{% endif %}"
+        {% if job.status == s %}disabled{% endif %}>{{ status_label(s) }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+
+
+<div class="card" style="margin-bottom:1rem">
+  <h2>Driver dispatch</h2>
+  {% if job.driver_id and driver %}
+  <p><strong>{{ driver.name }}</strong>
+    {% if driver.phone %} · <a href="tel:{{ driver.phone }}">{{ driver.phone }}</a>{% endif %}
+  </p>
+  {% else %}
+  <p class="muted">No driver assigned yet.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('job_assign_driver', jid=job.id) }}" style="margin-bottom:1rem">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="assign_driver">Assign driver</label>
+        <select id="assign_driver" name="driver_id">
+          <option value="">— Unassigned —</option>
+          {% for d in all_drivers or [] %}
+          <option value="{{ d.id }}" {% if job.driver_id == d.id %}selected{% endif %}>
+            {{ d.name }}{% if d.phone %} ({{ d.phone }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" type="submit">Save assignment</button>
+      <a class="btn btn-outline" href="{{ url_for('drivers_list') }}">Manage drivers</a>
+    </div>
+  </form>
+  {% if job.driver_id and driver and driver.phone %}
+  <form method="post" action="{{ url_for('job_text_driver', jid=job.id) }}">
+    <div class="form-group">
+      <label for="driver_to">Driver phone</label>
+      <input id="driver_to" name="to_address" value="{{ driver.phone }}" required>
+    </div>
+    <div class="form-group">
+      <label for="driver_body">Next-stop message</label>
+      <textarea id="driver_body" name="body" rows="10" required>{{ driver_sms_body }}</textarea>
+    </div>
+    <p class="hint">Saves an SMS draft (same as customer texts). Nothing sends until you click Send or Mark sent.</p>
+    <div class="form-actions">
+      <button class="btn btn-mint" type="submit">Text driver next stop (save draft)</button>
+    </div>
+  </form>
+  {% elif job.driver_id and driver and not driver.phone %}
+  <p class="muted">This driver has no phone — <a href="{{ url_for('driver_edit', did=driver.id) }}">edit driver</a> to add one.</p>
+  {% else %}
+  <p class="hint">Pick a driver above first, then you can text them the next delivery details.</p>
+  {% endif %}
+  {% if job.materials %}
+  <p style="margin-top:0.75rem"><strong>Materials:</strong> {{ job.materials }}</p>
+  {% endif %}
+</div>
+
+<div class="grid grid-2" style="margin-bottom:1.25rem">
+  <div class="card">
+    <h2>Delivery</h2>
+    <dl>
+      <div class="dl-row"><dt>Contractor</dt>
+        <dd><a href="{{ url_for('contractor_detail', cid=job.contractor_id) }}">{{ job.company_name }}</a>
+          {% if job.contact_name %} · {{ job.contact_name }}{% endif %}
+          {% if job.contractor_phone %}<br><a href="tel:{{ job.contractor_phone }}">{{ job.contractor_phone }}</a>{% endif %}
+        </dd>
+      </div>
+      <div class="dl-row"><dt>Supplier</dt><dd>{{ job.supplier or '—' }}</dd></div>
+      <div class="dl-row"><dt>Order #</dt><dd>{{ job.order_ref or '—' }}</dd></div>
+      <div class="dl-row"><dt>Jobsite</dt><dd>{{ job.job_address or '—' }}{% if job.city %}, {{ job.city }}{% endif %}</dd></div>
+      <div class="dl-row"><dt>Miles</dt>
+        <dd>{% if job.miles is not none %}{{ '%.1f'|format(job.miles) }} mi
+          {% if q_info.custom %} <span class="badge badge-custom">Custom</span>{% endif %}
+          {% else %}—{% endif %}
+        </dd>
+      </div>
+      <div class="dl-row"><dt>Scheduled</dt><dd>{{ job.scheduled_at or '—' }}</dd></div>
+      <div class="dl-row"><dt>Delivered</dt><dd>{{ job.delivered_at or '—' }}</dd></div>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Pricing</h2>
+    <dl>
+      <div class="dl-row"><dt>Delivery quote</dt>
+        <dd>{% if job.quote_amount is not none %}<strong>${{ '%.2f'|format(job.quote_amount) }}</strong>
+          {% elif q_info.custom %}<span class="badge badge-custom">Needs custom quote</span>
+          {% else %}—{% endif %}
+        </dd>
+      </div>
+      <div class="dl-row"><dt>Extra wait</dt>
+        <dd>{% if job.wait_minutes_extra %}{{ '%.0f'|format(job.wait_minutes_extra) }} min → ${{ '%.2f'|format(job.wait_fee or 0) }}{% else %}None (first 15 min included){% endif %}</dd>
+      </div>
+      <div class="dl-row"><dt>Total</dt>
+        <dd class="price" style="font-size:1.4rem;font-weight:800;color:var(--navy)">
+          {% if job.quote_amount is not none %}
+            ${{ '%.2f'|format((job.quote_amount or 0) + (job.wait_fee or 0)) }}
+          {% else %}—{% endif %}
+        </dd>
+      </div>
+      <div class="dl-row"><dt>Extra stops</dt><dd>{{ job.extra_stops_notes or '—' }}</dd></div>
+      <div class="dl-row"><dt>Notes</dt><dd>{{ job.notes or '—' }}</dd></div>
+      <div class="dl-row"><dt>Created</dt><dd class="muted">{{ job.created_at }}</dd></div>
+      <div class="dl-row"><dt>Updated</dt><dd class="muted">{{ job.updated_at }}</dd></div>
+    </dl>
+    {% if q_info.detail %}<p class="hint">{{ q_info.detail }}</p>{% endif %}
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:1.25rem">
+  <div class="card">
+    <h2>Text customer</h2>
+    <p class="hint">Draft only — nothing sends until you confirm.</p>
+    {% if job.contractor_phone or (contractor and contractor.phone) %}
+    <form method="post" action="{{ url_for('job_text', jid=job.id) }}">
+      <div class="form-group">
+        <label for="sms_to">Phone</label>
+        <input id="sms_to" name="to_address" value="{{ job.contractor_phone or contractor.phone }}" required>
+      </div>
+      <div class="form-group">
+        <label for="sms_body">Message</label>
+        <textarea id="sms_body" name="body" rows="4" required>{{ default_sms_body }}</textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-mint" type="submit">Save SMS draft</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="muted">Add a phone on the contractor to draft a text.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Email invoice</h2>
+    <p class="hint">Builds an invoice from quote + wait fees. Saves as draft email.</p>
+    <form method="post" action="{{ url_for('job_invoice', jid=job.id) }}">
+      <div class="form-group">
+        <label for="inv_to">To email</label>
+        <input id="inv_to" name="to_address" type="email" value="{{ contractor.email if contractor and contractor.email else '' }}" {% if contractor and contractor.email %}{% else %}placeholder="Add email on contractor"{% endif %}>
+      </div>
+      <div class="form-group">
+        <label for="inv_subject">Subject</label>
+        <input id="inv_subject" name="subject" value="{{ invoice_subject }}">
+      </div>
+      <div class="form-group">
+        <label for="inv_body">Body</label>
+        <textarea id="inv_body" name="body" rows="8">{{ invoice_body }}</textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-mint" type="submit">Save invoice draft</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if messages %}
+<div class="card" style="margin-bottom:1.25rem">
+  <h2>Job messages</h2>
+  <ul class="timeline">
+    {% for m in messages %}
+    <li>
+      <div><a href="{{ url_for('message_detail', mid=m.id) }}">#{{ m.id }} {{ m.channel }}</a>
+        · <span class="badge badge-{{ 'delivered' if m.status == 'sent' else 'quoted' }}">{{ m.status }}</span>
+        → {{ m.to_address }}
+      </div>
+      <div class="when">{{ m.created_at }}{% if m.created_by_name %} · {{ m.created_by_name }}{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2>Add note</h2>
+    <form method="post" action="{{ url_for('job_note', jid=job.id) }}">
+      <div class="form-group">
+        <textarea name="message" required placeholder="Activity note…"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-mint" type="submit">Add to timeline</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Activity timeline</h2>
+    {% if activity %}
+    <ul class="timeline">
+      {% for a in activity %}
+      <li>
+        <div>{{ a.message }}</div>
+        <div class="when">{{ a.created_at }}{% if a.user_name %} · {{ a.user_name }}{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">No activity yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

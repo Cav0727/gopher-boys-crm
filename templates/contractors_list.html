@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Contractors — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Contractors</h1>
+  <div class="btn-group">
+    <a class="btn" href="{{ url_for('contractor_new') }}">+ Add Contractor</a>
+    <a class="btn btn-outline" href="{{ url_for('export_contractors') }}">Export CSV</a>
+  </div>
+</div>
+<div class="card">
+  {% if contractors %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th><th>Contact</th><th>Phone</th><th>Email</th><th>Jobs</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in contractors %}
+        <tr>
+          <td><a href="{{ url_for('contractor_detail', cid=c.id) }}"><strong>{{ c.company_name }}</strong></a></td>
+          <td>{{ c.contact_name or '—' }}</td>
+          <td>{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% else %}—{% endif %}</td>
+          <td>{{ c.email or '—' }}</td>
+          <td>{{ c.job_count }}</td>
+          <td><a class="btn btn-sm btn-secondary" href="{{ url_for('contractor_edit', cid=c.id) }}">Edit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No contractors yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

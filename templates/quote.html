@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Quote Calculator — Gopher Boys CRM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Quote calculator</h1>
+  <a class="btn btn-outline" href="{{ url_for('rates') }}">View rate card</a>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2>Delivery + wait</h2>
+    <p class="hint">Pooler, GA 31322 supplier → your jobsite · one-way road miles</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="q-miles">Miles</label>
+        <input type="number" id="q-miles" min="0" step="0.1" placeholder="e.g. 22">
+      </div>
+      <div class="form-group">
+        <label for="q-wait">Extra wait (min beyond included 15)</label>
+        <input type="number" id="q-wait" min="0" step="1" value="0">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn" id="q-btn">Calculate</button>
+    </div>
+    <div id="q-out" class="quote-result" style="display:none;margin-top:1rem">
+      <div class="price" id="q-price"></div>
+      <p id="q-delivery" class="hint"></p>
+      <p id="q-wait-detail" class="hint"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quick rate table</h2>
+    <div class="table-wrap">
+      <table class="rate-table">
+        <thead><tr><th>Miles</th><th>One-way price</th></tr></thead>
+        <tbody>
+          {% for miles, price in rate_table %}
+          <tr><td>Up to {{ miles }}{% if miles == 10 %} (base){% endif %}</td><td>${{ price }}</td></tr>
+          {% endfor %}
+          <tr><td>Over 30</td><td><span class="badge badge-custom">Ask for quote</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:0.75rem">First 10 miles included, then $3 per mile. Wait: first 15 min free, then $20 / 15 min.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function run() {
+  const miles = document.getElementById('q-miles').value;
+  const wait = document.getElementById('q-wait').value || 0;
+  const out = document.getElementById('q-out');
+  if (miles === '') { out.style.display='none'; return; }
+  const r = await fetch(`/api/quote?miles=${encodeURIComponent(miles)}&wait_extra=${encodeURIComponent(wait)}`);
+  const d = await r.json();
+  out.style.display = 'block';
+  const price = document.getElementById('q-price');
+  const del = document.getElementById('q-delivery');
+  const w = document.getElementById('q-wait-detail');
+  if (d.delivery.custom) {
+    price.textContent = 'Custom quote required';
+    del.textContent = d.delivery.detail;
+    w.textContent = d.wait.detail || '';
+  } else if (d.delivery.ok) {
+    price.textContent = '$' + Number(d.total).toFixed(2);
+    del.textContent = 'Delivery: ' + d.delivery.detail;
+    w.textContent = d.wait.fee ? ('Wait: ' + d.wait.detail) : 'Wait: first 15 min included';
+  } else {
+    price.textContent = d.delivery.label;
+    del.textContent = '';
+    w.textContent = '';
+  }
+}
+document.getElementById('q-btn').addEventListener('click', run);
+document.getElementById('q-miles').addEventListener('change', run);
+document.getElementById('q-wait').addEventListener('change', run);
+</script>
+{% endblock %}
