@@ -3,6 +3,7 @@ services:
     name: gopher-boys-crm
     runtime: python
     plan: free
+    region: virginia
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
@@ -11,10 +12,6 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: DATABASE_PATH
-        value: /var/data/gopher.db
+        value: /tmp/gopher.db
       - key: PYTHON_VERSION
-        value: "3.12"
-    disk:
-      name: gopher-data
-      mountPath: /var/data
-      sizeGB: 1
+        value: "3.12.8"
