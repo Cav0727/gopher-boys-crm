@@ -143,7 +143,11 @@
           <div class="form-group full">
             <label for="job_address">Jobsite / delivery address *</label>
             <input id="job_address" name="job_address" required value="{{ form.get('job_address','') }}"
-                   placeholder="Street address where materials go">
+                   placeholder="Start typing street address (Coastal GA)"
+                   autocomplete="off">
+            <input type="hidden" id="job_lat" name="job_lat" value="{{ form.get('job_lat','') }}">
+            <input type="hidden" id="job_lon" name="job_lon" value="{{ form.get('job_lon','') }}">
+            <p class="hint" style="margin:0.25rem 0 0">Suggestions biased to Pooler / Coastal Georgia.</p>
           </div>
           <div class="form-group">
             <label for="city">City / area</label>
@@ -192,6 +196,7 @@
     </div>
 {% endblock %}
 {% block scripts %}
+  <script src="{{ url_for('static', filename='js/address-autocomplete.js') }}"></script>
   <script>
   const SUPPLIERS = {{ suppliers_json | tojson }};
   const ROUTE_API = {{ url_for('api_route_miles') | tojson }};
@@ -323,6 +328,10 @@
       }
     }
 
+    const jobLat = (document.getElementById('job_lat').value || '').trim();
+    const jobLon = (document.getElementById('job_lon').value || '').trim();
+    const city = (document.getElementById('city').value || '').trim();
+
     status.textContent = 'Calculating miles (Pooler → supplier → jobsite)…';
     if (routeAbort) routeAbort.abort();
     routeAbort = new AbortController();
@@ -330,7 +339,14 @@
       const res = await fetch(ROUTE_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ supplier_id, supplier_address, jobsite }),
+        body: JSON.stringify({
+          supplier_id,
+          supplier_address,
+          jobsite,
+          city,
+          jobsite_lat: jobLat || null,
+          jobsite_lon: jobLon || null,
+        }),
         signal: routeAbort.signal,
       });
       const data = await res.json();
@@ -378,6 +394,22 @@
   syncSupplierUI();
   if (document.getElementById('job_address').value && document.getElementById('supplier_id').value) {
     scheduleRouteRefresh();
+  }
+
+  if (window.attachAddressAutocomplete) {
+    attachAddressAutocomplete({
+      input: '#job_address',
+      cityInput: '#city',
+      latInput: '#job_lat',
+      lonInput: '#job_lon',
+      apiUrl: {{ url_for('api_address_suggest') | tojson }},
+      onSelect: function() { scheduleRouteRefresh(); },
+    });
+    attachAddressAutocomplete({
+      input: '#supplier_other',
+      apiUrl: {{ url_for('api_address_suggest') | tojson }},
+      onSelect: function() { scheduleRouteRefresh(); },
+    });
   }
   </script>
 {% endblock %}

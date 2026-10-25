@@ -1139,3 +1139,39 @@ textarea { min-height: 90px; resize: vertical; }
   }
   .public-brand-name { letter-spacing: 0.04em !important; font-size: 1.55rem !important; }
 }
+
+/* Address autocomplete dropdown */
+.addr-ac-wrap {
+  position: relative;
+  width: 100%;
+}
+.addr-ac-wrap > input {
+  width: 100%;
+}
+.addr-ac-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.addr-ac-list li {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.addr-ac-list li:hover,
+.addr-ac-list li.is-active {
+  background: var(--mint-2);
+  color: var(--navy);
+}

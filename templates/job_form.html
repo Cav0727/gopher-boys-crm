@@ -62,7 +62,11 @@
       </div>
       <div class="form-group full">
         <label for="job_address">Job address</label>
-        <input id="job_address" name="job_address" value="{{ form.get('job_address','') }}">
+        <input id="job_address" name="job_address" value="{{ form.get('job_address','') }}"
+               placeholder="Start typing street address (Coastal GA)" autocomplete="off">
+        <input type="hidden" id="job_lat" name="job_lat" value="{{ form.get('job_lat','') }}">
+        <input type="hidden" id="job_lon" name="job_lon" value="{{ form.get('job_lon','') }}">
+        <span class="hint">Address suggestions biased to Pooler / Coastal Georgia.</span>
       </div>
       <div class="form-group">
         <label for="city">City</label>
@@ -112,6 +116,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/address-autocomplete.js') }}"></script>
 <script>
 const milesEl = document.getElementById('miles');
 const quoteEl = document.getElementById('quote_amount');
@@ -137,5 +142,15 @@ async function autoQuote() {
 milesEl.addEventListener('change', autoQuote);
 milesEl.addEventListener('blur', autoQuote);
 if (milesEl.value && !manualEl.checked && !quoteEl.value) autoQuote();
+
+if (window.attachAddressAutocomplete) {
+  attachAddressAutocomplete({
+    input: '#job_address',
+    cityInput: '#city',
+    latInput: '#job_lat',
+    lonInput: '#job_lon',
+    apiUrl: {{ url_for('api_address_suggest') | tojson }},
+  });
+}
 </script>
 {% endblock %}

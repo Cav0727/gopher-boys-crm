@@ -63,7 +63,7 @@ from suppliers import (
     suppliers_by_category,
     full_address,
 )
-from miles import calc_route_miles, ensure_geocode_cache_table
+from miles import calc_route_miles, ensure_geocode_cache_table, suggest_addresses
 
 app = Flask(__name__)
 
@@ -75,7 +75,7 @@ SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
 # Public endpoints that skip login
-PUBLIC_ENDPOINTS = {"login", "health", "static", "public_home", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles"}
+PUBLIC_ENDPOINTS = {"login", "health", "static", "public_home", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles", "api_address_suggest"}
 
 
 @app.context_processor
@@ -511,6 +511,8 @@ def public_request():
         preferred = _f("preferred_at")
         miles = _float("miles")
         notes = _f("notes")
+        job_lat = _float("job_lat")
+        job_lon = _float("job_lon")
 
         # Resolve supplier label + address for CRM storage
         known = get_supplier(supplier_id)
@@ -521,11 +523,15 @@ def public_request():
             supplier = supplier_other
             pickup_for_miles = supplier_other
 
-        # Server-side miles: Pooler → supplier → jobsite (even if JS failed)
+        # Server-side miles: Pooler → supplier → jobsite (even if JS failed).
+        # Prefer autocomplete lat/lon when present so Coastal GA geocode is not ambiguous.
         route = calc_route_miles(
             supplier_id=supplier_id if known else None,
             supplier_address=pickup_for_miles,
             jobsite_address=job_address,
+            jobsite_lat=job_lat,
+            jobsite_lon=job_lon,
+            jobsite_city=city,
         )
         if route.get("ok") and route.get("miles") is not None:
             miles = float(route["miles"])
@@ -635,6 +641,9 @@ def api_route_miles():
         supplier_id = (data.get("supplier_id") or "").strip() or None
         supplier_address = (data.get("supplier_address") or "").strip() or None
         jobsite = (data.get("jobsite") or data.get("job_address") or "").strip() or None
+        jobsite_city = (data.get("city") or data.get("jobsite_city") or "").strip() or None
+        jobsite_lat = data.get("jobsite_lat") or data.get("lat")
+        jobsite_lon = data.get("jobsite_lon") or data.get("lon")
     else:
         supplier_id = (request.args.get("supplier_id") or "").strip() or None
         supplier_address = (request.args.get("supplier_address") or "").strip() or None
@@ -643,14 +652,32 @@ def api_route_miles():
             or request.args.get("job_address")
             or ""
         ).strip() or None
+        jobsite_city = (request.args.get("city") or request.args.get("jobsite_city") or "").strip() or None
+        jobsite_lat = request.args.get("jobsite_lat") or request.args.get("lat")
+        jobsite_lon = request.args.get("jobsite_lon") or request.args.get("lon")
 
     route = calc_route_miles(
         supplier_id=supplier_id,
         supplier_address=supplier_address,
         jobsite_address=jobsite,
+        jobsite_lat=jobsite_lat,
+        jobsite_lon=jobsite_lon,
+        jobsite_city=jobsite_city,
     )
     quote = calc_delivery_quote(route.get("miles"))
     return jsonify({"route": route, "quote": quote})
+
+
+@app.route("/api/address-suggest")
+def api_address_suggest():
+    """Free address autocomplete (Photon), biased to Pooler / Coastal GA."""
+    q = (request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit") or 6)
+    except (TypeError, ValueError):
+        limit = 6
+    suggestions = suggest_addresses(q, limit=limit)
+    return jsonify({"q": q, "suggestions": suggestions})
 
 
 
