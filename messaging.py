@@ -1,7 +1,10 @@
 """SMS / email draft helpers for Gopher Boys CRM.
 
-Never auto-sends. Live send only when env credentials are set AND the user
-clicks an explicit Send button in the UI.
+Customer/driver messages: never auto-send. Live send only when env credentials
+are set AND the user clicks an explicit Send button in the UI.
+
+Exception: owner alert SMS on new public /request submissions — automatic
+when Twilio is configured (ALERT_PHONE / CONTACT_TEL).
 """
 
 from __future__ import annotations
@@ -13,8 +16,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
-CONTACT_NAME = "Mack Ridgeway"
-CONTACT_PHONE = "(912) 777-2339"
+CONTACT_NAME = os.environ.get("CONTACT_NAME") or "Chris Vincent"
+CONTACT_PHONE = os.environ.get("CONTACT_PHONE") or "(912) 244-0464"
+CONTACT_TEL = os.environ.get("CONTACT_TEL") or "+19122440464"
+ALERT_PHONE = os.environ.get("ALERT_PHONE") or CONTACT_TEL
 SERVICE_AREA = "Pooler, GA 31322"
 BUSINESS_NAME = "Gopher Boys"
 
@@ -46,6 +51,38 @@ def default_sms_body(contractor_name: str | None = None, job_ref: str | None = N
         f"Please call/text {CONTACT_PHONE} to confirm pickup/delivery. "
         f"Thanks! — {BUSINESS_NAME}, {SERVICE_AREA}"
     )
+
+
+def build_owner_alert_sms(
+    *,
+    company: str | None,
+    contact: str | None,
+    phone: str | None,
+    supplier: str | None,
+    jobsite: str | None,
+    city: str | None = None,
+    miles: float | None = None,
+    quote_amount: float | None = None,
+    job_id: int | None = None,
+) -> str:
+    """Short owner-alert SMS for a new public pickup request."""
+    who_bits = [b for b in (company, contact) if b]
+    who = " / ".join(who_bits) if who_bits else "Unknown"
+    site = jobsite or "—"
+    if city:
+        site = f"{site}, {city}"
+    miles_s = f"{miles:.1f} mi" if miles is not None else "—"
+    quote_s = f"${quote_amount:.2f}" if quote_amount is not None else "TBD"
+    job_bit = f"#{job_id} " if job_id else ""
+    lines = [
+        f"Gopher Boys — new pickup request {job_bit}".rstrip(),
+        f"{who}",
+        f"Phone: {phone or '—'}",
+        f"Supplier: {supplier or '—'}",
+        f"Jobsite: {site}",
+        f"Miles/quote: {miles_s} / {quote_s}",
+    ]
+    return "\n".join(lines)
 
 
 def build_invoice(job: Any, contractor: Any) -> tuple[str, str, str]:
@@ -115,7 +152,7 @@ def build_invoice(job: Any, contractor: Any) -> tuple[str, str, str]:
       </table>
       <p style="color:#5a6a7e;font-size:0.9rem">
         Based in {SERVICE_AREA}. Questions? Contact {CONTACT_NAME} —
-        <a href="tel:+19127772339">{CONTACT_PHONE}</a>.
+        <a href="tel:{CONTACT_TEL}">{CONTACT_PHONE}</a>.
       </p>
     </div>
   </div>
@@ -255,7 +292,6 @@ def build_driver_dispatch_sms(job, contractor, driver) -> str:
         f"Quote: {quote}",
         f"Customer: {company} · {phone}",
         f"Notes: {notes}",
-        f"— Mack {CONTACT_PHONE}",
+        f"— {CONTACT_NAME} {CONTACT_PHONE}",
     ]
     return chr(10).join(lines)
-

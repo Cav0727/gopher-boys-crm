@@ -36,8 +36,13 @@ from db import (
     utcnow,
 )
 from messaging import (
+    ALERT_PHONE,
+    CONTACT_NAME,
+    CONTACT_PHONE,
+    CONTACT_TEL,
     build_driver_dispatch_sms,
     build_invoice,
+    build_owner_alert_sms,
     default_sms_body,
     email_configured,
     mailto_link,
@@ -60,8 +65,7 @@ from miles import calc_route_miles, ensure_geocode_cache_table
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or "gopher-boys-crm-local-dev-key"
 
-CONTACT_NAME = "Mack Ridgeway"
-CONTACT_PHONE = "(912) 777-2339"
+# Public/business contact — centralized in messaging.py (env overrideable)
 SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
@@ -74,6 +78,7 @@ def inject_globals():
     return {
         "CONTACT_NAME": CONTACT_NAME,
         "CONTACT_PHONE": CONTACT_PHONE,
+        "CONTACT_TEL": CONTACT_TEL,
         "SERVICE_AREA": SERVICE_AREA,
         "SLOGAN": SLOGAN,
         "STATUSES": STATUSES,
@@ -289,6 +294,74 @@ def _find_or_create_contractor(conn, company: str, contact: str, phone: str, ema
     return cur.lastrowid
 
 
+
+def _notify_owner_new_request(
+    *,
+    contractor_id: int,
+    job_id: int,
+    company: str | None,
+    contact: str | None,
+    phone: str | None,
+    supplier: str | None,
+    job_address: str | None,
+    city: str | None,
+    miles: float | None,
+    quote_amount: float | None,
+) -> None:
+    """Text Chris about a new /request. Never raises — job already saved."""
+    body = build_owner_alert_sms(
+        company=company,
+        contact=contact,
+        phone=phone,
+        supplier=supplier,
+        jobsite=job_address,
+        city=city,
+        miles=miles,
+        quote_amount=quote_amount,
+        job_id=job_id,
+    )
+    to_address = ALERT_PHONE
+    now = utcnow()
+    ok, detail = False, "not attempted"
+    try:
+        ok, detail = send_sms_twilio(to_address, body)
+    except Exception as exc:  # noqa: BLE001
+        ok, detail = False, str(exc)
+    status = "sent" if ok else "failed"
+    if not ok:
+        # Keep failure reason visible to staff in Messages
+        body = f"{body}\n\n[ALERT FAILED: {detail}]"
+    try:
+        with db() as conn:
+            conn.execute(
+                """
+                INSERT INTO messages
+                    (contractor_id, job_id, channel, to_address, subject, body,
+                     status, created_by, created_at, sent_at)
+                VALUES (?, ?, 'sms', ?, ?, ?, ?, NULL, ?, ?)
+                """,
+                (
+                    contractor_id,
+                    job_id,
+                    to_address,
+                    "Owner alert: new pickup request",
+                    body,
+                    status,
+                    now,
+                    now if ok else None,
+                ),
+            )
+            note = (
+                f"Owner alert SMS sent to {to_address}"
+                if ok
+                else f"Owner alert SMS failed ({detail})"
+            )
+            add_activity(conn, job_id, note, None)
+    except Exception:  # noqa: BLE001
+        # Job already created; do not break the customer redirect
+        pass
+
+
 @app.route("/request", methods=["GET", "POST"])
 def public_request():
     """Customer-facing pickup/delivery request — no login required."""
@@ -408,6 +481,20 @@ def public_request():
             )
             jid = cur.lastrowid
             add_activity(conn, jid, "Submitted via website", None)
+
+        # Owner alert SMS to Chris (automatic; not a customer message)
+        _notify_owner_new_request(
+            contractor_id=cid,
+            job_id=jid,
+            company=company,
+            contact=contact,
+            phone=phone,
+            supplier=supplier,
+            job_address=job_address,
+            city=city,
+            miles=miles,
+            quote_amount=quote_amount,
+        )
 
         return redirect(url_for("public_request_thanks"))
 

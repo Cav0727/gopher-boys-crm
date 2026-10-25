@@ -12,12 +12,12 @@
         <strong>Need it urgently?</strong>
         <p style="margin:0.5rem 0 0;font-size:1.15rem">
           Call <strong>{{ CONTACT_NAME }}</strong> at
-          <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+          <a href="tel:{{ CONTACT_TEL }}">{{ CONTACT_PHONE }}</a>
         </p>
       </div>
       <div class="form-actions" style="justify-content:center">
         <a class="btn btn-orange btn-lg" href="{{ url_for('public_request') }}">Submit another request</a>
-        <a class="btn btn-outline-navy" href="tel:+19127772339">Call now</a>
+        <a class="btn btn-outline-navy" href="tel:{{ CONTACT_TEL }}">Call now</a>
         <a class="btn btn-outline-navy" href="{{ url_for('public_home') }}">Home</a>
       </div>
     </div>

@@ -181,11 +181,11 @@
         </div>
         <div class="form-actions">
           <button class="btn btn-orange btn-lg" type="submit">Submit request</button>
-          <a class="btn btn-outline" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
+          <a class="btn btn-outline" href="tel:{{ CONTACT_TEL }}">Call {{ CONTACT_PHONE }}</a>
         </div>
         <p class="hint" style="margin-top:1rem">
           Urgent? Call <strong>{{ CONTACT_NAME }}</strong> at
-          <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>.
+          <a href="tel:{{ CONTACT_TEL }}">{{ CONTACT_PHONE }}</a>.
           We won’t auto-text or spam you.
         </p>
       </form>

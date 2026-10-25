@@ -50,7 +50,11 @@ On first boot (empty `users` table), two accounts are seeded with the same passw
 | `ADMIN_PASSWORD` | Recommended | Password for seeded Chris/Mack accounts on first boot. |
 | `DATABASE_PATH` | Optional | SQLite file path. Default: `data/gopher.db`. On Render disk use `/var/data/gopher.db`. |
 | `PORT` | Optional | Listen port. Default `5055` locally; hosts set `$PORT`. |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | Optional | If all set, SMS drafts show a **Send via Twilio** button. |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | **Required on Belmo for owner SMS alerts** | If all set: (1) auto-texts Chris on every successful `/request`, and (2) SMS drafts show a **Send via Twilio** button. Without them, jobs still save; the alert is stored as `failed` in `messages`. |
+| `ALERT_PHONE` | Optional | Owner alert destination. Default: `+19122440464` (Chris). |
+| `CONTACT_PHONE` | Optional | Display phone. Default: `(912) 244-0464`. |
+| `CONTACT_TEL` | Optional | `tel:` href / E.164. Default: `+19122440464`. Used as alert destination when `ALERT_PHONE` unset. |
+| `CONTACT_NAME` | Optional | Public contact name. Default: `Chris Vincent`. |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Optional | If set, email drafts can Send via SMTP (`SMTP_PORT` default 587). |
 | `RESEND_API_KEY` | Optional | Alternative to SMTP for sending invoice emails. |
 
@@ -80,7 +84,8 @@ Admins create users at **Users → New user**.
 - `/messages` lists all drafts/sent/failed
 - Message detail: **Mark sent** (after you text/email manually), **Copy**, **mailto:** link
 - Live **Send** only appears when Twilio / SMTP / Resend env vars are configured
-- **Never auto-sends** — Chris must click Send (or Mark sent) for every customer contact
+- **Customer / driver SMS:** never auto-send — Chris must click Send (or Mark sent)
+- **Owner alert exception:** every successful public `/request` auto-texts Chris at `ALERT_PHONE` (default `+19122440464`) when Twilio is configured
 
 
 ## Public customer request
@@ -93,15 +98,25 @@ Admins create users at **Users → New user**.
 - Distance: prefer public **OSRM** driving miles; fallback Nominatim geocode + haversine × 1.3 road factor. Geocodes cached in SQLite `geocode_cache`. Nominatim User-Agent + 1 req/s throttle.
 - Shows flyer **rate card** + **quote calculator** (auto-filled miles + optional wait)
 - On submit: creates/links a **Contractor**, creates a Job with status **`request`**, activity note “Submitted via website”
-- **Never** auto-sends SMS or email
+- **Owner SMS alert:** automatically texts Chris (`ALERT_PHONE` / default `+19122440464`) with company/contact, phone, supplier, jobsite, miles/quote. Stored in `messages` as `sent` or `failed`. Does **not** text the customer.
+- Customer SMS/email still never auto-send
 - Spam basics: honeypot field + per-IP rate limit (5 / 10 min)
-- Success page: thank-you + Mack’s phone **(912) 777-2339** for urgent needs
+- Success page: thank-you + Chris’s phone **(912) 244-0464** for urgent needs
 - Login page links “Request a pickup”; dashboard shows a badge when web requests are waiting
 - Filter Jobs → **Request** to see them
 
 ### Deploy note (Belmo)
 
 Live site is on Belmo free (`gopher-boys-crm-7fae.onbelmo.uk`). **Auto-deploy is OFF** — after pushing to `main`, redeploy manually in the Belmo dashboard. There is no Belmo CLI in this repo.
+
+**Belmo env vars for owner SMS alerts (required for live texts on `/request`):**
+
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM` (Twilio number in E.164, e.g. `+1…`)
+- Optional: `ALERT_PHONE=+19122440464`, `CONTACT_PHONE=(912) 244-0464`, `CONTACT_TEL=+19122440464`
+
+Without Twilio, requests still create jobs; the owner alert is logged as a failed message for staff. Do not invent or commit Twilio credentials.
 
 ## Features
 
@@ -153,4 +168,6 @@ Formula: first 10 miles = $110, then **$3/mi**. Wait: first 15 min included, the
 
 ## Contact
 
-Request a pickup: **Mack Ridgeway** — (912) 777-2339 · Pooler, GA 31322
+Request a pickup: **Chris Vincent** — (912) 244-0464 · Pooler, GA 31322
+
+(Seeded CRM contractor **Ridgeway Roofing Co.** / Mack Ridgeway / (912) 777-2339 is sample contractor data, not the public business contact.)

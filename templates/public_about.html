@@ -23,7 +23,7 @@
     <p class="slogan-callout">{{ SLOGAN }}</p>
     <p class="hint" style="margin-bottom:0">
       Contact: <strong>{{ CONTACT_NAME }}</strong> —
-      <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+      <a href="tel:{{ CONTACT_TEL }}">{{ CONTACT_PHONE }}</a>
     </p>
   </div>
 
@@ -64,7 +64,7 @@
   </div>
   <div class="form-actions" style="margin-top:1.5rem">
     <a class="btn btn-orange btn-lg" href="{{ url_for('public_request') }}">Request a pickup</a>
-    <a class="btn btn-outline-navy" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
+    <a class="btn btn-outline-navy" href="tel:{{ CONTACT_TEL }}">Call {{ CONTACT_PHONE }}</a>
   </div>
 </div>
 {% endblock %}
