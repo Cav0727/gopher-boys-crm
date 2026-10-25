@@ -84,7 +84,9 @@
       <div class="form-group">
         <label for="miles">One-way road miles</label>
         <input id="miles" name="miles" type="number" min="0" step="0.1" value="{{ form.get('miles','') }}">
+        <button type="button" class="btn btn-outline btn-sm" id="calc-miles-btn" style="margin-top:0.35rem">Auto-calculate miles</button>
         <span class="hint" id="miles-hint"></span>
+        <span class="hint" id="route-status-form" style="display:block;margin-top:0.25rem" aria-live="polite"></span>
       </div>
       <div class="form-group">
         <label for="quote_amount">Quote amount ($)</label>
@@ -131,6 +133,10 @@ const milesEl = document.getElementById('miles');
 const quoteEl = document.getElementById('quote_amount');
 const manualEl = document.getElementById('manual_quote');
 const hintEl = document.getElementById('miles-hint');
+const routeStatus = document.getElementById('route-status-form');
+const ROUTE_API = {{ url_for('api_route_miles') | tojson }};
+let routeTimer = null;
+let routeAbort = null;
 
 async function autoQuote() {
   if (manualEl.checked) return;
@@ -140,7 +146,6 @@ async function autoQuote() {
   const data = await r.json();
   if (data.delivery.custom) {
     hintEl.innerHTML = '<span class="badge badge-custom">Custom quote</span> ' + data.delivery.detail;
-    // leave quote blank for custom unless already set
   } else if (data.delivery.ok) {
     quoteEl.value = data.delivery.amount.toFixed(2);
     hintEl.textContent = data.delivery.detail;
@@ -148,9 +153,70 @@ async function autoQuote() {
     hintEl.textContent = data.delivery.label;
   }
 }
+
+async function refreshRouteMiles() {
+  const supplier = (document.getElementById('supplier').value || '').trim();
+  const jobsite = (document.getElementById('job_address').value || '').trim();
+  const city = (document.getElementById('city').value || '').trim();
+  const state = (document.getElementById('state').value || 'GA').trim();
+  const jobLat = (document.getElementById('job_lat').value || '').trim();
+  const jobLon = (document.getElementById('job_lon').value || '').trim();
+  if (!supplier) {
+    if (routeStatus) routeStatus.textContent = 'Enter a supplier address to auto-calculate miles.';
+    return;
+  }
+  if (!jobsite || jobsite.length < 5) {
+    if (routeStatus) routeStatus.textContent = 'Enter a jobsite address (and city) to auto-calculate.';
+    return;
+  }
+  if (routeStatus) routeStatus.textContent = 'Calculating miles…';
+  if (routeAbort) routeAbort.abort();
+  routeAbort = new AbortController();
+  try {
+    const res = await fetch(ROUTE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        supplier_address: supplier,
+        jobsite,
+        city,
+        state,
+        jobsite_lat: jobLat || null,
+        jobsite_lon: jobLon || null,
+      }),
+      signal: routeAbort.signal,
+    });
+    const data = await res.json();
+    const route = data.route || {};
+    if (route.ok && route.miles != null) {
+      milesEl.value = route.miles;
+      if (routeStatus) routeStatus.textContent = route.detail || (route.miles + ' mi');
+      autoQuote();
+    } else {
+      if (routeStatus) routeStatus.textContent = route.detail || 'Could not estimate miles.';
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    if (routeStatus) routeStatus.textContent = 'Miles estimate unavailable.';
+  }
+}
+
+function scheduleRouteRefresh() {
+  clearTimeout(routeTimer);
+  routeTimer = setTimeout(refreshRouteMiles, 400);
+}
+
 milesEl.addEventListener('change', autoQuote);
 milesEl.addEventListener('blur', autoQuote);
 if (milesEl.value && !manualEl.checked && !quoteEl.value) autoQuote();
+
+document.getElementById('calc-miles-btn').addEventListener('click', refreshRouteMiles);
+['supplier', 'job_address', 'city', 'state'].forEach(function(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', scheduleRouteRefresh);
+  if (id !== 'state') el.addEventListener('input', scheduleRouteRefresh);
+});
 
 if (window.attachAddressAutocomplete) {
   attachAddressAutocomplete({
@@ -160,6 +226,7 @@ if (window.attachAddressAutocomplete) {
     latInput: '#job_lat',
     lonInput: '#job_lon',
     apiUrl: {{ url_for('api_address_suggest') | tojson }},
+    onSelect: function() { scheduleRouteRefresh(); },
   });
 }
 </script>

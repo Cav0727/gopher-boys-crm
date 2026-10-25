@@ -168,8 +168,8 @@
             <input id="miles" name="miles" type="number" min="0" step="0.1"
                    value="{{ form.get('miles','') }}"
                    placeholder="Auto-calculated" readonly>
-            <p class="hint" style="margin:0.25rem 0 0">
-              Pooler base → supplier → jobsite. Recalculated on submit for the CRM quote.
+            <p class="hint" id="route-status-form" style="margin:0.25rem 0 0" aria-live="polite">
+              Pick a supplier and jobsite — miles &amp; price fill automatically.
             </p>
           </div>
           <div class="form-group full">
@@ -307,42 +307,52 @@
   let routeTimer = null;
   let routeAbort = null;
 
+  function setRouteStatus(msg) {
+    const top = document.getElementById('route-status');
+    const formStatus = document.getElementById('route-status-form');
+    if (top) top.textContent = msg || '';
+    if (formStatus) formStatus.textContent = msg || 'Pick a supplier and jobsite — miles & price fill automatically.';
+  }
+
   async function refreshRouteMiles() {
-    const status = document.getElementById('route-status');
     const milesInput = document.getElementById('miles');
     const calcMiles = document.getElementById('calc-miles');
     const sel = document.getElementById('supplier_id');
     const jobsite = (document.getElementById('job_address').value || '').trim();
     const other = (document.getElementById('supplier_other').value || '').trim();
+    const jobLat = (document.getElementById('job_lat').value || '').trim();
+    const jobLon = (document.getElementById('job_lon').value || '').trim();
+    const city = (document.getElementById('city').value || '').trim();
+    const state = (document.getElementById('state').value || 'GA').trim();
 
     let supplier_id = sel.value || null;
     let supplier_address = null;
     if (!supplier_id) {
-      status.textContent = '';
+      if (jobsite) setRouteStatus('Select a supplier above to auto-calculate miles & price.');
+      else setRouteStatus('Pick a supplier and jobsite — miles & price fill automatically.');
       return;
     }
     if (supplier_id === 'other') {
       supplier_id = null;
       supplier_address = other;
-      if (!supplier_address || !jobsite) {
-        status.textContent = jobsite ? 'Enter the other supplier address to estimate miles.' : '';
+      if (!supplier_address) {
+        setRouteStatus('Enter the other supplier address to estimate miles.');
+        return;
+      }
+      if (!jobsite) {
+        setRouteStatus('Enter the jobsite address to estimate miles.');
         return;
       }
     } else {
       const s = selectedSupplier();
       supplier_address = s ? s.address : null;
       if (!jobsite) {
-        status.textContent = 'Enter the jobsite address to estimate miles.';
+        setRouteStatus('Enter the jobsite / delivery address to estimate miles.');
         return;
       }
     }
 
-    const jobLat = (document.getElementById('job_lat').value || '').trim();
-    const jobLon = (document.getElementById('job_lon').value || '').trim();
-    const city = (document.getElementById('city').value || '').trim();
-    const state = (document.getElementById('state').value || 'GA').trim();
-
-    status.textContent = 'Calculating miles (Pooler → supplier → jobsite)…';
+    setRouteStatus('Calculating miles (Pooler → supplier → jobsite)…');
     if (routeAbort) routeAbort.abort();
     routeAbort = new AbortController();
     try {
@@ -360,26 +370,37 @@
         }),
         signal: routeAbort.signal,
       });
+      if (!res.ok) {
+        setRouteStatus('Miles estimate failed (HTTP ' + res.status + '). Try again or we will calculate on submit.');
+        return;
+      }
       const data = await res.json();
       const route = data.route || {};
+      const quote = data.quote || {};
       if (route.ok && route.miles != null) {
         milesInput.value = route.miles;
         calcMiles.value = route.miles;
-        status.textContent = (route.approx ? 'Approx: ' : '') + (route.detail || (route.miles + ' mi'));
+        let msg = (route.approx ? 'Approx: ' : '') + (route.detail || (route.miles + ' mi'));
+        if (quote.ok && quote.amount != null) {
+          msg += ' · Est. $' + Number(quote.amount).toFixed(2);
+        } else if (quote.custom) {
+          msg += ' · Custom quote (over 30 mi)';
+        }
+        setRouteStatus(msg);
         showCalc();
         showFormQuote(route.miles);
       } else {
-        status.textContent = route.detail || 'Could not estimate miles yet.';
+        setRouteStatus(route.detail || 'Could not estimate miles yet — check city/state or pick a suggestion.');
       }
     } catch (err) {
       if (err.name === 'AbortError') return;
-      status.textContent = 'Miles estimate unavailable — we will calculate on submit.';
+      setRouteStatus('Miles estimate unavailable — we will calculate on submit.');
     }
   }
 
   function scheduleRouteRefresh() {
     clearTimeout(routeTimer);
-    routeTimer = setTimeout(refreshRouteMiles, 450);
+    routeTimer = setTimeout(refreshRouteMiles, 350);
   }
 
   document.getElementById('calc-btn').addEventListener('click', showCalc);
@@ -401,23 +422,23 @@
   function jobsiteReadyForMiles() {
     const jobsite = (document.getElementById('job_address').value || '').trim();
     const city = (document.getElementById('city').value || '').trim();
-    const state = (document.getElementById('state').value || '').trim();
+    const state = (document.getElementById('state').value || 'GA').trim();
     const lat = (document.getElementById('job_lat').value || '').trim();
     const lon = (document.getElementById('job_lon').value || '').trim();
-    if (lat && lon) return true; // autocomplete selection
-    // street + city + state (state defaults to GA) is enough for accurate geocode
-    if (jobsite.length >= 5 && city.length >= 2 && state) return true;
+    if (!jobsite || jobsite.length < 5) return false;
+    if (lat && lon) return true; // autocomplete selection with coords
+    // State defaults to GA — enough with street; city improves accuracy
+    if (state) return true;
+    if (city.length >= 2) return true;
     if (/\b\d{5}(?:-\d{4})?\b/.test(jobsite)) return true;
-    if (/\b(GA|SC|Georgia|South Carolina)\b/i.test(jobsite)) return true;
     return false;
   }
 
   function scheduleRouteRefreshIfReady() {
+    const jobsite = (document.getElementById('job_address').value || '').trim();
     if (!jobsiteReadyForMiles()) {
-      const status = document.getElementById('route-status');
-      const jobsite = (document.getElementById('job_address').value || '').trim();
       if (jobsite.length >= 3) {
-        status.textContent = 'Pick an address suggestion (or add city + state) for accurate miles.';
+        setRouteStatus('Keep typing or pick a suggestion — add city if miles look off.');
       }
       return;
     }
@@ -444,7 +465,10 @@
       latInput: '#job_lat',
       lonInput: '#job_lon',
       apiUrl: {{ url_for('api_address_suggest') | tojson }},
-      onSelect: function() { scheduleRouteRefresh(); },
+      onSelect: function() {
+        // Coords/city/state already filled — always kick miles refresh
+        scheduleRouteRefresh();
+      },
     });
     attachAddressAutocomplete({
       input: '#supplier_other',
