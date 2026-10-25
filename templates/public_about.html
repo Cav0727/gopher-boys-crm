@@ -1,61 +1,70 @@
 {% extends "public_base.html" %}
 {% block title %}About Us — Gopher Boys{% endblock %}
 {% block content %}
-    <div class="page-header">
-      <h1>About us</h1>
-      <p class="muted" style="margin:0;max-width:40rem">
-        Local material runs for Coastal Georgia crews — so you stay on the jobsite.
-      </p>
-    </div>
+<section class="page-hero">
+  <p class="landing-kicker">About Gopher Boys</p>
+  <h1 class="page-title">Built for crews who stay on the job</h1>
+  <p class="page-lead">
+    Local material runs for Coastal Georgia contractors — so you keep building.
+  </p>
+</section>
 
-    <div class="grid grid-2" style="align-items:start">
-      <div class="card">
-        <h2>Who we are</h2>
-        <p>
-          <strong>Gopher Boys</strong> is a material pickup and delivery service based in
-          <strong>{{ SERVICE_AREA }}</strong>. We run supplier yards to jobsites for
-          roofing and construction contractors across Savannah, Pooler, and Coastal Georgia.
-        </p>
-        <p>
-          You order the materials. We pick them up and put them where the work is happening.
-          {{ SLOGAN }}
-        </p>
-        <p class="hint" style="margin-bottom:0">
-          Contact: <strong>{{ CONTACT_NAME }}</strong> —
-          <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
-        </p>
-      </div>
+<div class="grid grid-2" style="align-items:start">
+  <div class="card card-accent">
+    <h2 class="card-title">Who we are</h2>
+    <p>
+      <strong>Gopher Boys</strong> is a material pickup and delivery service based in
+      <strong>{{ SERVICE_AREA }}</strong>. We run supplier yards to jobsites for
+      roofing and construction contractors across Savannah, Pooler, and Coastal Georgia.
+    </p>
+    <p>
+      You order the materials. We pick them up and put them where the work is happening.
+    </p>
+    <p class="slogan-callout">{{ SLOGAN }}</p>
+    <p class="hint" style="margin-bottom:0">
+      Contact: <strong>{{ CONTACT_NAME }}</strong> —
+      <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+    </p>
+  </div>
 
-      <div class="card">
-        <h2>Our vision</h2>
-        <p>
-          Builders should build — not burn half a day in a supply-yard line or a loaded truck
-          across town. We exist to take those runs off your plate so crews stay productive
-          and schedules stay intact.
-        </p>
-        <ul class="public-terms">
-          <li>One pickup + one ground-level delivery, priced up front.</li>
-          <li>Honest miles from our Pooler base through the supplier to your jobsite.</li>
-          <li>No spam, no auto texts — we confirm with you before we roll.</li>
-        </ul>
-      </div>
-    </div>
+  <div class="card card-accent-mint">
+    <h2 class="card-title">Our vision</h2>
+    <p>
+      Builders should build — not burn half a day in a supply-yard line or a loaded truck
+      across town. We exist to take those runs off your plate so crews stay productive
+      and schedules stay intact.
+    </p>
+    <ul class="public-terms">
+      <li>One pickup + one ground-level delivery, priced up front.</li>
+      <li>Honest miles from our Pooler base through the supplier to your jobsite.</li>
+      <li>No spam, no auto texts — we confirm with you before we roll.</li>
+    </ul>
+  </div>
+</div>
 
-    <div class="card" style="margin-top:1.25rem">
-      <h2>What we stand for</h2>
-      <div class="grid grid-2">
-        <div>
-          <p><strong>Reliability.</strong> Show up when we say we will. Materials ready, no drama.</p>
-          <p><strong>Clarity.</strong> Straightforward rates (see our request page). Custom only when miles go past 30.</p>
-        </div>
-        <div>
-          <p><strong>Respect for the job.</strong> We work around your schedule and site conditions.</p>
-          <p style="margin-bottom:0"><strong>Local.</strong> Coastal Georgia is home — Pooler is base.</p>
-        </div>
-      </div>
-      <div class="form-actions" style="margin-top:1.25rem">
-        <a class="btn btn-mint" href="{{ url_for('public_request') }}">Request a pickup</a>
-        <a class="btn btn-outline" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
-      </div>
+<div class="card" style="margin-top:1.5rem">
+  <h2 class="card-title">What we stand for</h2>
+  <div class="values-grid">
+    <div class="value-tile">
+      <strong>Reliability</strong>
+      <p>Show up when we say we will. Materials ready, no drama.</p>
     </div>
+    <div class="value-tile">
+      <strong>Clarity</strong>
+      <p>Straightforward rates. Custom only when miles go past 30.</p>
+    </div>
+    <div class="value-tile">
+      <strong>Respect for the job</strong>
+      <p>We work around your schedule and site conditions.</p>
+    </div>
+    <div class="value-tile">
+      <strong>Local</strong>
+      <p>Coastal Georgia is home — Pooler is base.</p>
+    </div>
+  </div>
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a class="btn btn-orange btn-lg" href="{{ url_for('public_request') }}">Request a pickup</a>
+    <a class="btn btn-outline-navy" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
+  </div>
+</div>
 {% endblock %}

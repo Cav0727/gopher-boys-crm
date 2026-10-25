@@ -2,22 +2,23 @@
 {% block title %}Request received — Gopher Boys{% endblock %}
 {% block content %}
     <div class="card thanks-card">
-      <h1>Thanks — we got your request</h1>
-      <p>
-        Our team will review it and confirm price and timing before dispatch.
+      <p class="landing-kicker">Request received</p>
+      <h1 class="page-title" style="font-size:clamp(1.6rem,4vw,2.1rem)">Thanks — we got it</h1>
+      <p class="page-lead" style="margin-left:auto;margin-right:auto">
+        Our team will review your pickup request and confirm price and timing before dispatch.
         We won’t spam you or auto-send texts.
       </p>
-      <div class="mint-box" style="margin:1.25rem 0">
+      <div class="mint-box" style="margin:1.25rem 0;text-align:left">
         <strong>Need it urgently?</strong>
         <p style="margin:0.5rem 0 0;font-size:1.15rem">
           Call <strong>{{ CONTACT_NAME }}</strong> at
           <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
         </p>
       </div>
-      <div class="form-actions">
-        <a class="btn btn-mint" href="{{ url_for('public_request') }}">Submit another request</a>
-        <a class="btn btn-outline" href="tel:+19127772339">Call now</a>
-        <a class="btn btn-outline" href="{{ url_for('public_home') }}">Home</a>
+      <div class="form-actions" style="justify-content:center">
+        <a class="btn btn-orange btn-lg" href="{{ url_for('public_request') }}">Submit another request</a>
+        <a class="btn btn-outline-navy" href="tel:+19127772339">Call now</a>
+        <a class="btn btn-outline-navy" href="{{ url_for('public_home') }}">Home</a>
       </div>
     </div>
 {% endblock %}

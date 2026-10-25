@@ -1,68 +1,76 @@
 {% extends "public_base.html" %}
 {% block title %}Gopher Boys — WE PICK UP. YOU KEEP BUILDING.{% endblock %}
 {% block content %}
-<div class="page-header home-header">
-  <h1>Welcome</h1>
-  <p class="muted" style="margin:0;max-width:36rem">
-    Material pickup &amp; delivery for Coastal Georgia crews. Based in
-    <strong>{{ SERVICE_AREA }}</strong>. No customer account needed —
-    request a pickup anytime. Staff use login below.
+<section class="landing-hero" aria-labelledby="landing-title">
+  <p class="landing-kicker">Coastal Georgia · Pooler base</p>
+  <h1 id="landing-title" class="landing-title">We pick up.<br>You keep building.</h1>
+  <p class="landing-lead">
+    Material pickup &amp; delivery for roofing and construction crews.
+    Supplier yard to jobsite — based in <strong>{{ SERVICE_AREA }}</strong>.
+    No customer account needed.
   </p>
-</div>
+  <div class="landing-cta-row">
+    <a class="btn btn-orange btn-xl" href="{{ url_for('public_request') }}">Request a pickup</a>
+    <a class="btn btn-outline-navy btn-xl" href="{{ url_for('public_request') }}#rates">See rates</a>
+  </div>
+  <ul class="landing-trust" aria-label="Why contractors use us">
+    <li><strong>Price before we roll</strong> — confirm first, no surprises</li>
+    <li><strong>Honest miles</strong> — Pooler → supplier → jobsite</li>
+    <li><strong>No spam</strong> — we don’t auto-text customers</li>
+  </ul>
+</section>
 
 <section class="menu-box" aria-label="Site menu">
-  <h2 class="menu-box-title">Menu</h2>
-  <p class="menu-box-sub muted">Everyone can open these pages. Customers never need to log in.</p>
+  <h2 class="menu-box-title">What do you need?</h2>
+  <p class="menu-box-sub">Open any page below — customers never log in.</p>
 
   <div class="menu-section">
-    <h3>Customers</h3>
+    <h3>For contractors</h3>
     <div class="menu-grid">
       <a class="menu-card menu-card-primary" href="{{ url_for('public_request') }}">
+        <span class="menu-card-icon" aria-hidden="true">🚚</span>
         <span class="menu-card-label">Request a pickup</span>
-        <span class="menu-card-desc">Tell us supplier + jobsite. We’ll confirm price before we roll. No login.</span>
+        <span class="menu-card-desc">Supplier + jobsite. We’ll confirm price before we roll. No login.</span>
+        <span class="menu-card-cta">Start request →</span>
       </a>
       <a class="menu-card" href="{{ url_for('public_request') }}#rates">
+        <span class="menu-card-icon" aria-hidden="true">📋</span>
         <span class="menu-card-label">Rates / calculator</span>
-        <span class="menu-card-desc">See delivery rates and estimate miles Pooler → supplier → jobsite.</span>
+        <span class="menu-card-desc">Delivery rates and miles estimate: Pooler → supplier → jobsite.</span>
+        <span class="menu-card-cta">View rates →</span>
       </a>
       <a class="menu-card" href="{{ url_for('public_about') }}">
+        <span class="menu-card-icon" aria-hidden="true">🏗️</span>
         <span class="menu-card-label">About us</span>
-        <span class="menu-card-desc">Who we are, our vision, and how we work with contractors.</span>
+        <span class="menu-card-desc">Who we are, our vision, and how we work with Coastal Georgia crews.</span>
+        <span class="menu-card-cta">Learn more →</span>
       </a>
     </div>
   </div>
 
   <div class="menu-section">
-    <h3>Staff</h3>
-    <div class="menu-grid">
-      {% if current_user %}
-      <a class="menu-card menu-card-staff" href="{{ url_for('dashboard') }}">
-        <span class="menu-card-label">Open dashboard</span>
-        <span class="menu-card-desc">Signed in as {{ current_user.name }}. Jobs, contractors, messages.</span>
-      </a>
-      {% else %}
-      <a class="menu-card menu-card-staff" href="{{ url_for('login') }}">
-        <span class="menu-card-label">Staff login</span>
-        <span class="menu-card-desc">For Gopher Boys team only — not for customers.</span>
-      </a>
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="menu-section">
-    <h3>Contact</h3>
+    <h3>Talk to us</h3>
     <div class="menu-grid">
       <a class="menu-card menu-card-contact" href="tel:+19127772339">
+        <span class="menu-card-icon" aria-hidden="true">📞</span>
         <span class="menu-card-label">{{ CONTACT_NAME }}</span>
         <span class="menu-card-desc">Call or text {{ CONTACT_PHONE }} · Pooler GA 31322</span>
+        <span class="menu-card-cta">Call now →</span>
       </a>
     </div>
   </div>
+  <p class="staff-quiet">
+    {% if current_user %}
+    Team: <a href="{{ url_for('dashboard') }}">Open staff CRM</a> (signed in as {{ current_user.name }})
+    {% else %}
+    Gopher Boys team? <a href="{{ url_for('login') }}">Staff login</a> → CRM dashboard
+    {% endif %}
+  </p>
 </section>
 
 <div class="card home-note">
-  <p style="margin:0">
-    <strong>{{ SLOGAN }}</strong>
+  <p class="home-note-slogan">{{ SLOGAN }}</p>
+  <p class="home-note-body">
     We don’t auto-text or email customers — we confirm with you before dispatch.
   </p>
 </div>

@@ -7,14 +7,19 @@
       </div>
     {% endif %}
 
-    <div class="page-header">
-      <h1>Request a pickup</h1>
-      <p class="muted" style="margin:0;max-width:36rem">
+    <section class="page-hero">
+      <p class="landing-kicker">No login required</p>
+      <h1 class="page-title">Request a pickup</h1>
+      <p class="page-lead">
         Pick your supplier, enter the jobsite, and we’ll estimate miles from
-        <strong>Pooler → supplier → delivery</strong>. We’ll confirm price and timing before we roll —
+        <strong>Pooler → supplier → delivery</strong>. We confirm price and timing before we roll —
         no spam, no auto texts.
       </p>
-    </div>
+      <div class="landing-cta-row landing-cta-row-compact">
+        <a class="btn btn-orange" href="#request-form">Jump to form</a>
+        <a class="btn btn-outline-navy" href="#rates">View rates</a>
+      </div>
+    </section>
 
     <div class="card about-blurb">
       <p style="margin:0">
@@ -24,9 +29,9 @@
       </p>
     </div>
 
-    <div class="grid grid-2" style="margin-bottom:1.25rem;align-items:start">
-      <div class="card" id="rates">
-        <h2>Delivery rates</h2>
+    <div class="grid grid-2 rates-quote-grid" style="margin-bottom:1.5rem;align-items:start">
+      <div class="card card-accent rates-card" id="rates">
+        <h2 class="card-title">Delivery rates</h2>
         <p class="hint">One-way road miles: Pooler, GA 31322 → supplier → jobsite.</p>
         <div class="table-wrap">
           <table class="rate-table">
@@ -50,8 +55,8 @@
         </ul>
       </div>
 
-      <div class="card quote-card">
-        <h2>Quick quote calculator</h2>
+      <div class="card card-accent-mint quote-card">
+        <h2 class="card-title">Quick quote calculator</h2>
         <p class="hint">Miles auto-fill when you pick a supplier and enter a jobsite below.</p>
         <div class="form-grid">
           <div class="form-group">
@@ -69,14 +74,14 @@
         </div>
         <div id="route-status" class="hint route-status" aria-live="polite"></div>
         <div class="form-actions">
-          <button type="button" class="btn btn-mint" id="calc-btn">Calculate</button>
+          <button type="button" class="btn btn-orange" id="calc-btn">Calculate</button>
           <button type="button" class="btn btn-outline" id="calc-use-miles">Use miles in form ↓</button>
         </div>
       </div>
     </div>
 
-    <div class="card">
-      <h2>Your pickup request</h2>
+    <div class="card card-request" id="request-form-card">
+      <h2 class="card-title">Your pickup request</h2>
       <form method="post" id="request-form" novalidate>
         {# Honeypot — leave empty #}
         <div class="hp-field" aria-hidden="true">
@@ -175,7 +180,7 @@
           <div class="hint" id="form-quote-detail"></div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-mint" type="submit">Submit request</button>
+          <button class="btn btn-orange btn-lg" type="submit">Submit request</button>
           <a class="btn btn-outline" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
         </div>
         <p class="hint" style="margin-top:1rem">
