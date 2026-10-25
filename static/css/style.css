@@ -187,6 +187,8 @@ a:hover { text-decoration: underline; }
 .btn:hover { background: var(--navy-2); }
 .btn-secondary { background: #5a6a7e; }
 .btn-mint { background: #2d8a62; }
+.btn-danger { background: #b33a3a; }
+.btn-danger:hover { background: #8f2d2d; }
 .btn-orange { background: var(--orange); }
 .btn-outline {
   background: transparent;

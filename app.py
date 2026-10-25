@@ -902,6 +902,49 @@ def contractor_edit(cid: int):
     return render_template("contractor_form.html", contractor=c, form=as_form(c))
 
 
+
+
+@app.route("/contractors/<int:cid>/delete", methods=["POST"])
+def contractor_delete(cid: int):
+    """Hard-delete contractor and cascaded jobs/activity/messages (staff logged-in)."""
+    with db() as conn:
+        c = conn.execute(
+            "SELECT id, company_name FROM contractors WHERE id = ?", (cid,)
+        ).fetchone()
+        if not c:
+            flash("Contractor not found.", "error")
+            return redirect(url_for("contractors_list"))
+        job_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE contractor_id = ?", (cid,)
+        ).fetchone()["n"]
+        # Explicit cleanup so job-tied rows never linger if FKs differ across DBs
+        job_ids = [
+            r["id"]
+            for r in conn.execute(
+                "SELECT id FROM jobs WHERE contractor_id = ?", (cid,)
+            ).fetchall()
+        ]
+        if job_ids:
+            placeholders = ",".join("?" * len(job_ids))
+            conn.execute(
+                f"DELETE FROM messages WHERE job_id IN ({placeholders})", job_ids
+            )
+            conn.execute(
+                f"DELETE FROM activity WHERE job_id IN ({placeholders})", job_ids
+            )
+            conn.execute(
+                f"DELETE FROM jobs WHERE id IN ({placeholders})", job_ids
+            )
+        conn.execute("DELETE FROM messages WHERE contractor_id = ?", (cid,))
+        conn.execute("DELETE FROM contractors WHERE id = ?", (cid,))
+    flash(
+        f"Deleted contractor '{c['company_name']}'"
+        + (f" and {job_count} job(s)." if job_count else "."),
+        "success",
+    )
+    return redirect(url_for("contractors_list"))
+
+
 # ── Jobs ───────────────────────────────────────────────────────────────────
 
 
@@ -1237,6 +1280,23 @@ def job_note(jid: int):
     flash("Note added.", "success")
     return redirect(url_for("job_detail", jid=jid))
 
+
+
+
+
+@app.route("/jobs/<int:jid>/delete", methods=["POST"])
+def job_delete(jid: int):
+    """Hard-delete job, its activity notes, and messages tied to the job."""
+    with db() as conn:
+        job = conn.execute("SELECT id FROM jobs WHERE id = ?", (jid,)).fetchone()
+        if not job:
+            flash("Job not found.", "error")
+            return redirect(url_for("jobs_list"))
+        conn.execute("DELETE FROM messages WHERE job_id = ?", (jid,))
+        conn.execute("DELETE FROM activity WHERE job_id = ?", (jid,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (jid,))
+    flash(f"Job #{jid} deleted.", "success")
+    return redirect(url_for("jobs_list"))
 
 
 # ── Drivers ────────────────────────────────────────────────────────────────

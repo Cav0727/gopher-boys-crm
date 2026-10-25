@@ -7,6 +7,10 @@
   </h1>
   <div class="btn-group">
     <a class="btn btn-secondary" href="{{ url_for('job_edit', jid=job.id) }}">Edit</a>
+    <form method="post" action="{{ url_for('job_delete', jid=job.id) }}" style="display:inline"
+      onsubmit="return confirm('Permanently delete job #{{ job.id }}? Notes and messages tied to this job will also be removed. This cannot be undone.');">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
     <a class="btn btn-outline" href="{{ url_for('jobs_list') }}">Back</a>
   </div>
 </div>
