@@ -205,7 +205,7 @@
     </div>
 {% endblock %}
 {% block scripts %}
-  <script src="{{ url_for('static', filename='js/address-autocomplete.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/address-autocomplete.js', v='20261025-ac1') }}"></script>
   <script>
   const SUPPLIERS = {{ suppliers_json | tojson }};
   const ROUTE_API = {{ url_for('api_route_miles') | tojson }};
@@ -400,7 +400,7 @@
 
   function scheduleRouteRefresh() {
     clearTimeout(routeTimer);
-    routeTimer = setTimeout(refreshRouteMiles, 350);
+    routeTimer = setTimeout(refreshRouteMiles, 700);
   }
 
   document.getElementById('calc-btn').addEventListener('click', showCalc);
@@ -427,10 +427,11 @@
     const lon = (document.getElementById('job_lon').value || '').trim();
     if (!jobsite || jobsite.length < 5) return false;
     if (lat && lon) return true; // autocomplete selection with coords
-    // State defaults to GA — enough with street; city improves accuracy
-    if (state) return true;
-    if (city.length >= 2) return true;
+    if (city.length >= 2 && state) return true; // street + city + state
+    // Complete-looking free-text (street type or ZIP) + state
     if (/\b\d{5}(?:-\d{4})?\b/.test(jobsite)) return true;
+    if (/\b(ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|ln|lane|ct|court|way|pkwy|parkway)\b/i.test(jobsite) && state) return true;
+    if (/\b(GA|SC|Georgia|South Carolina)\b/i.test(jobsite)) return true;
     return false;
   }
 

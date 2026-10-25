@@ -169,7 +169,7 @@ def _float(name: str, default: float | None = None) -> float | None:
 
 
 # Bump when shipping jobsite/miles fixes — Belmo has no auto-deploy; use /api/build-info to verify.
-BUILD_ID = "auto-calc-fix-1"
+BUILD_ID = "suggest-photon-v2"
 
 @app.route("/health")
 def health():

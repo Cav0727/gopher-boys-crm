@@ -465,72 +465,209 @@ def _suggest_nominatim(query: str, limit: int) -> list[dict[str, Any]]:
     return results
 
 
+_STREET_SUFFIXES = (
+    "Avenue", "Ave", "Street", "St", "Drive", "Dr", "Road", "Rd",
+    "Boulevard", "Blvd", "Lane", "Ln", "Court", "Ct", "Way", "Parkway", "Pkwy",
+)
+_QUERY_STOP = {
+    "st", "street", "ave", "avenue", "blvd", "boulevard", "rd", "road",
+    "dr", "drive", "ln", "lane", "ct", "court", "way", "pkwy", "parkway",
+    "ga", "sc", "usa", "us", "the", "of",
+}
+
+
+def _query_tokens(query: str) -> tuple[list[str], list[str]]:
+    """Return (word_tokens, number_tokens) from a user query."""
+    raw = re.findall(r"[a-z0-9]+", (query or "").lower())
+    words = [t for t in raw if not t.isdigit() and t not in _QUERY_STOP and len(t) > 1]
+    nums = [t for t in raw if t.isdigit()]
+    return words, nums
+
+
+def _suggestion_matches_query(sug: dict[str, Any], query: str) -> bool:
+    """Drop Nominatim/Photon noise that does not share street tokens with q."""
+    words, nums = _query_tokens(query)
+    street = (sug.get("street") or "").lower()
+    display = (sug.get("display") or "").lower()
+    hay = f"{street} {display}"
+    if words:
+        # Every word token must appear in street/display (allows Park → Park Avenue)
+        if not all(w in hay for w in words):
+            return False
+        # Prefer word tokens hitting the street line (not only city)
+        if street and not any(w in street for w in words):
+            return False
+    if nums:
+        # If suggestion has a house number, it should match typed number
+        leading = street.split()[0] if street else ""
+        has_house = bool(sug.get("street") and re.match(r"^\d+", street.strip()))
+        if has_house and not any(n == leading or n in street.split()[:2] for n in nums):
+            return False
+    return True
+
+
+def _photon_query_variants(query: str) -> list[str]:
+    """Bias partial street queries toward Pooler / Savannah / GA."""
+    q = (query or "").strip()
+    if not q:
+        return []
+    variants = [q]
+    lower = q.lower()
+    has_place = bool(re.search(r"\b(ga|georgia|sc|pooler|savannah|pembroke|bluffton)\b", lower))
+    if not has_place:
+        variants.append(f"{q}, Pooler, GA")
+        variants.append(f"{q}, Savannah, GA")
+        variants.append(f"{q}, GA")
+    # "123 Park" → also try common street suffixes (Nominatim/Photon need them)
+    if re.match(r"^\d+\s+[A-Za-z][A-Za-z\s\.]*$", q) and not re.search(
+        r"\b(ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|ln|lane|ct|court|way|pkwy|parkway)\b",
+        lower,
+    ):
+        # Take first street word after house number
+        parts = q.split(None, 1)
+        if len(parts) == 2:
+            num, name = parts
+            for suf in ("Avenue", "Street", "Drive", "Road", "Boulevard", "Lane"):
+                variants.append(f"{num} {name} {suf}, Pooler, GA")
+                variants.append(f"{num} {name} {suf}, Savannah, GA")
+    # Dedupe preserving order
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in variants:
+        key = v.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(v)
+    return out[:10]
+
+
 def _suggest_photon(query: str, limit: int) -> list[dict[str, Any]]:
-    params = urllib.parse.urlencode(
-        {
-            "q": query,
-            "lat": BASE_LAT,
-            "lon": BASE_LON,
-            "limit": max(limit * 3, 12),
-            "lang": "en",
-        }
-    )
-    data = _http_get_json(f"{PHOTON_URL}?{params}", timeout=8.0)
     results: list[dict[str, Any]] = []
-    if data and isinstance(data, dict):
+    seen_coord: set[tuple] = set()
+    for variant in _photon_query_variants(query):
+        # layer=house,street keeps typeahead on addresses/roads
+        params = urllib.parse.urlencode(
+            [
+                ("q", variant),
+                ("lat", str(BASE_LAT)),
+                ("lon", str(BASE_LON)),
+                ("limit", str(max(limit * 2, 8))),
+                ("lang", "en"),
+                ("layer", "house"),
+                ("layer", "street"),
+            ]
+        )
+        data = _http_get_json(f"{PHOTON_URL}?{params}", timeout=6.0)
+        if not data or not isinstance(data, dict):
+            continue
         for feat in data.get("features") or []:
             sug = _photon_props_to_suggestion(feat)
-            if sug:
-                sug["source"] = "photon"
-                results.append(sug)
+            if not sug:
+                continue
+            if not _suggestion_matches_query(sug, query):
+                continue
+            sug["source"] = "photon"
+            key = (round(float(sug["lat"]), 4), round(float(sug["lon"]), 4), (sug.get("street") or "").lower())
+            if key in seen_coord:
+                continue
+            seen_coord.add(key)
+            results.append(sug)
+        if len(results) >= limit * 2:
+            break
     return results
+
+
+def _rank_suggestion(sug: dict[str, Any], query: str) -> tuple:
+    """Prefer first-token street match, house #, Pooler, then nearer hits."""
+    words, nums = _query_tokens(query)
+    street = (sug.get("street") or "").lower()
+    city = (sug.get("city") or "").lower()
+    dist = float(sug.get("distance_mi") or 999)
+    street_words = [
+        t for t in re.findall(r"[a-z0-9]+", street)
+        if not t.isdigit() and t not in _QUERY_STOP
+    ]
+    # "Park" should rank Park Avenue above Durham Park Way
+    first_token = 0 if (words and street_words and street_words[0] == words[0]) else 1
+    pooler_boost = 0 if "pooler" in city else 1
+    if nums and street.startswith(nums[0] + " "):
+        house_boost = 0
+    elif nums and street_words and not street[:1].isdigit():
+        house_boost = 1  # street-level match without house #
+    else:
+        house_boost = 2 if nums else 0
+    return (first_token, house_boost, pooler_boost, dist)
 
 
 def suggest_addresses(query: str, limit: int = 6) -> list[dict[str, Any]]:
     """Address typeahead biased to Pooler / Coastal GA.
 
-    Nominatim (viewbox-bounded) is primary so local streets win over famous
-    far-away names. Photon fills gaps. Results farther than SERVICE_RADIUS_MI
-    are dropped; remaining are sorted nearest-to-Pooler first.
+    Photon first (fast typeahead) with Pooler/Savannah query variants, then
+    Nominatim as supplement. Irrelevant hits (no shared street tokens) are
+    dropped so partials like \"123 Park\" never return Bull Street.
     """
     q = (query or "").strip()
     if len(q) < 3:
         return []
     limit = max(1, min(int(limit or 6), 10))
-    cache_key = f"{q.lower()}|{limit}"
+    cache_key = f"v2|{q.lower()}|{limit}"
     now = time.time()
     cached = _suggest_cache.get(cache_key)
     if cached and cached[0] > now:
         return cached[1]
 
-    results = _suggest_nominatim(q, limit=limit)
-    # Photon only when Nominatim has nothing local (avoids fuzzy far/wrong streets)
-    if not results:
-        results = _suggest_photon(q, limit=limit)
+    # Photon first — no 1 req/s throttle, better for partial streets
+    results = _suggest_photon(q, limit=limit)
 
-    results.sort(key=lambda s: (s.get("distance_mi") is None, s.get("distance_mi") or 999))
-    # Dedupe near-identical street labels / coordinates
+    # Nominatim on the raw query + first expanded "123 Name Avenue, Pooler, GA"
+    # variant so house numbers resolve (Photon often misses them for partials).
+    nom_queries = [q]
+    for v in _photon_query_variants(q):
+        if v != q and "avenue" in v.lower() and "pooler" in v.lower():
+            nom_queries.append(v)
+            break
+    if len(results) < limit:
+        for nq in nom_queries:
+            for sug in _suggest_nominatim(nq, limit=limit):
+                # Match against the *user* query tokens, not the expanded one
+                if not _suggestion_matches_query(sug, q):
+                    continue
+                results.append(sug)
+            if len(results) >= limit * 2:
+                break
+
+    results.sort(key=lambda s: _rank_suggestion(s, q))
     deduped: list[dict[str, Any]] = []
     seen: set[tuple] = set()
     for s in results:
         key = (
             (s.get("street") or "").lower(),
             (s.get("city") or "").lower(),
-            (s.get("zip") or ""),
             round(float(s["lat"]), 4),
             round(float(s["lon"]), 4),
         )
         if key in seen:
             continue
         seen.add(key)
+        # Never put ZIP into city — keep fields clean for the form
+        city = (s.get("city") or "").strip()
+        # Drop county-as-city noise
+        if city.lower().endswith(" county"):
+            city = ""
+        s = dict(s)
+        s["city"] = city
         deduped.append(s)
-    results = deduped[:limit]
-    _suggest_cache[cache_key] = (now + _SUGGEST_TTL, results)
+        if len(deduped) >= limit:
+            break
+
+    _suggest_cache[cache_key] = (now + _SUGGEST_TTL, deduped)
     if len(_suggest_cache) > 200:
         expired = [k for k, (exp, _) in _suggest_cache.items() if exp <= now]
         for k in expired:
             _suggest_cache.pop(k, None)
-    return results
+    return deduped
+
 
 
 def osrm_driving_miles(points: list[tuple[float, float]]) -> float | None:

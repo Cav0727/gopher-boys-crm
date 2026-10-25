@@ -32,7 +32,7 @@
     var latInput = el(opts.latInput);
     var lonInput = el(opts.lonInput);
     var apiUrl = opts.apiUrl || '/api/address-suggest';
-    var debounceMs = opts.debounceMs != null ? opts.debounceMs : 400;
+    var debounceMs = opts.debounceMs != null ? opts.debounceMs : 250;
     var onSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
 
     var wrap = document.createElement('div');
@@ -78,12 +78,10 @@
       input.value = street || formatted;
 
       if (cityInput) {
+        // City name only — never append ZIP (ZIP stays on suggestion display / street geocode)
         var cityVal = (s.city || '').trim();
-        if (s.zip && cityVal && cityVal.indexOf(s.zip) < 0) {
-          cityVal = cityVal + ' ' + s.zip;
-        } else if (s.zip && !cityVal) {
-          cityVal = s.zip;
-        }
+        // Strip accidental ZIP if a prior bug left one in the field value we overwrite
+        cityVal = cityVal.replace(/\s+\d{5}(?:-\d{4})?\s*$/, '').trim();
         if (cityVal) cityInput.value = cityVal;
       }
 
@@ -147,21 +145,41 @@
       list.hidden = false;
     }
 
+    function showSearching() {
+      list.innerHTML = '';
+      var li = document.createElement('li');
+      li.className = 'addr-ac-status';
+      li.textContent = 'Searching addresses…';
+      list.appendChild(li);
+      list.hidden = false;
+    }
+
     function fetchSuggestions(q) {
       if (abort) abort.abort();
       abort = new AbortController();
+      showSearching();
       var url = apiUrl + (apiUrl.indexOf('?') >= 0 ? '&' : '?') + 'q=' + encodeURIComponent(q);
       fetch(url, {
         headers: { Accept: 'application/json' },
         signal: abort.signal,
+        credentials: 'same-origin',
       })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          if (!r.ok) throw new Error('suggest ' + r.status);
+          return r.json();
+        })
         .then(function (data) {
           render((data && data.suggestions) || []);
         })
         .catch(function (err) {
           if (err && err.name === 'AbortError') return;
-          hide();
+          list.innerHTML = '';
+          var li = document.createElement('li');
+          li.className = 'addr-ac-status';
+          li.textContent = 'No matches — add city or keep typing';
+          list.appendChild(li);
+          list.hidden = false;
+          items = [];
         });
     }
 

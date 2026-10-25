@@ -1144,6 +1144,7 @@ textarea { min-height: 90px; resize: vertical; }
 .addr-ac-wrap {
   position: relative;
   width: 100%;
+  z-index: 60;
 }
 .addr-ac-wrap > input {
   width: 100%;
@@ -1153,25 +1154,39 @@ textarea { min-height: 90px; resize: vertical; }
   left: 0;
   right: 0;
   top: calc(100% + 2px);
-  z-index: 40;
+  z-index: 80;
   margin: 0;
   padding: 0.25rem 0;
   list-style: none;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: var(--shadow);
-  max-height: 240px;
+  box-shadow: 0 8px 24px rgba(11, 31, 58, 0.18);
+  max-height: 260px;
   overflow-y: auto;
 }
+.card .addr-ac-list,
+.form-grid .addr-ac-list {
+  /* Keep dropdown above following grid rows */
+  z-index: 80;
+}
 .addr-ac-list li {
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.85rem;
   cursor: pointer;
   font-size: 0.92rem;
   color: var(--text);
+}
+.addr-ac-list li.addr-ac-status {
+  cursor: default;
+  color: var(--muted);
+  font-style: italic;
 }
 .addr-ac-list li:hover,
 .addr-ac-list li.is-active {
   background: var(--mint-2);
   color: var(--navy);
+}
+.addr-ac-list li.addr-ac-status:hover {
+  background: #fff;
+  color: var(--muted);
 }
