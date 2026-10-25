@@ -30,7 +30,7 @@
     var latInput = el(opts.latInput);
     var lonInput = el(opts.lonInput);
     var apiUrl = opts.apiUrl || '/api/address-suggest';
-    var debounceMs = opts.debounceMs != null ? opts.debounceMs : 300;
+    var debounceMs = opts.debounceMs != null ? opts.debounceMs : 400;
     var onSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
 
     var wrap = document.createElement('div');
@@ -70,14 +70,10 @@
 
     function applySuggestion(s) {
       suppress = true;
-      // Prefer street line for the address field; fall back to display/formatted
-      var street = (s.street || '').trim();
+      // Full formatted address so miles geocode stays Coastal GA even if coords drop
       var formatted = (s.formatted || s.display || '').trim();
-      if (street) {
-        input.value = street;
-      } else {
-        input.value = formatted;
-      }
+      var street = (s.street || '').trim();
+      input.value = formatted || street;
 
       if (cityInput) {
         var cityParts = [];
@@ -96,6 +92,7 @@
       }
 
       hide();
+      // change → parent can refresh miles WITH lat/lon already set
       input.dispatchEvent(new Event('change', { bubbles: true }));
       if (onSelect) onSelect(s);
       setTimeout(function () { suppress = false; }, 50);
