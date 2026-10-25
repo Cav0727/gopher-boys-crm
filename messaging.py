@@ -271,6 +271,7 @@ def send_sms_twilio(to_address: str, body: str) -> tuple[bool, str]:
             headers={
                 "Authorization": f"Basic {auth}",
                 "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "gopher-boys-crm/1.0",
             },
             method="POST",
         )
@@ -313,6 +314,7 @@ def send_email(to_address: str, subject: str, plain: str, html: str | None = Non
                 headers={
                     "Authorization": f"Bearer {resend_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": "gopher-boys-crm/1.0",
                 },
                 method="POST",
             )
