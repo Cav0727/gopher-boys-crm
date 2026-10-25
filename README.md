@@ -53,7 +53,7 @@ On first boot (empty `users` table), two accounts are seeded with the same passw
 | `RESEND_API_KEY` | **Preferred for owner email alerts** | If set, new `/request` submissions auto-email Chris (owner alert). Also enables Send on invoice drafts. Free Resend tier works; use `onboarding@resend.dev` as from-address until a domain is verified, or set `RESEND_FROM` / `SMTP_FROM`. |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Optional (alt to Resend) | SMTP send for owner alerts + invoice drafts (`SMTP_PORT` default 587). |
 | `ALERT_EMAIL` | Optional | Owner alert email. Default: `chris@ridgewayroofingco.com`. |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | Optional SMS fallback | If email is not configured (or email send fails) and all Twilio vars are set: auto-texts Chris on `/request`, and SMS drafts show **Send via Twilio**. |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | Optional (SMS only if email unset) | Used for owner `/request` alerts **only when** Resend/SMTP is **not** configured. Also enables **Send via Twilio** on SMS drafts. When email is configured, Twilio is never used for owner alerts (even if email send fails). |
 | `ALERT_PHONE` | Optional | Owner SMS destination. Default: `+19122440464` (Chris). |
 | `CONTACT_PHONE` | Optional | Display phone. Default: `(912) 244-0464`. |
 | `CONTACT_TEL` | Optional | `tel:` href / E.164. Default: `+19122440464`. Used as SMS alert destination when `ALERT_PHONE` unset. |
@@ -88,8 +88,8 @@ Admins create users at **Users → New user**.
 - Live **Send** only appears when Twilio / SMTP / Resend env vars are configured
 - **Customer / driver SMS:** never auto-send — Chris must click Send (or Mark sent)
 - **Owner alert exception:** every successful public `/request` auto-notifies Chris:
-  - **Primary:** email to `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend or SMTP is configured
-  - **Fallback:** SMS to `ALERT_PHONE` when Twilio is configured
+  - **Email-only** to `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend or SMTP is configured — **no Twilio fallback** (avoids burning SMS balance on email failures)
+  - **SMS-only** to `ALERT_PHONE` when email is **not** configured and Twilio is set
   - If neither works, the job is still created and the thank-you page shows a clear flash to call Chris
 
 
@@ -103,7 +103,7 @@ Admins create users at **Users → New user**.
 - Distance: prefer public **OSRM** driving miles; fallback Nominatim geocode + haversine × 1.3 road factor. Geocodes cached in SQLite `geocode_cache`. Nominatim User-Agent + 1 req/s throttle.
 - Shows flyer **rate card** + **quote calculator** (auto-filled miles + optional wait)
 - On submit: creates/links a **Contractor**, creates a Job with status **`request`**, activity note “Submitted via website”
-- **Owner alert:** emails Chris at `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend/SMTP is set; otherwise texts `ALERT_PHONE` if Twilio is set. Includes company/contact, phone, customer email, supplier, jobsite, materials, miles/quote. Stored in `messages` as `sent` or `failed`. Does **not** email or text the customer.
+- **Owner alert:** emails Chris at `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend/SMTP is set (email only — failed email does **not** fall back to Twilio). Otherwise texts `ALERT_PHONE` if Twilio is set. Includes company/contact, phone, customer email, supplier, jobsite, materials, miles/quote. Stored in `messages` as `sent` or `failed` with the provider error in the body. Does **not** email or text the customer.
 - If no alert channel works, job still saves and thank-you page flashes a clear “call us” warning
 - Customer SMS/email still never auto-send
 - Spam basics: honeypot field + per-IP rate limit (5 / 10 min)
@@ -115,18 +115,19 @@ Admins create users at **Users → New user**.
 
 Live site is on Belmo free (`gopher-boys-crm-7fae.onbelmo.uk`). **Auto-deploy is OFF** — after pushing to `main`, redeploy manually in the Belmo dashboard. There is no Belmo CLI in this repo.
 
-**Belmo env vars for owner alerts on `/request` (email preferred — Twilio is optional fallback):**
+**Belmo env vars for owner alerts on `/request` (email preferred — Twilio only when email is unset):**
 
-Email (pick one path):
+Email (pick one path — when set, owner alerts are **email-only**, no SMS fallback):
 
-- **Resend (easiest free tier):** `RESEND_API_KEY` = key from https://resend.com (free signup). Optional: `RESEND_FROM` or `SMTP_FROM` (default `onboarding@resend.dev` — Resend only delivers to the account owner email until a domain is verified).
+- **Resend (easiest free tier):** `RESEND_API_KEY` = key from https://resend.com (free signup). Optional: `RESEND_FROM` or `SMTP_FROM` (default `onboarding@resend.dev`).
+  - **Important:** with the default `onboarding@resend.dev` from-address, Resend only delivers to the **Resend account owner email**. If `ALERT_EMAIL` is a different address (e.g. `chris@ridgewayroofingco.com`), verify a sending domain in Resend and set `RESEND_FROM` to an address on that domain, **or** set `ALERT_EMAIL` to the Resend account email until a domain is verified.
 - **Or SMTP:** `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` (and optional `SMTP_PORT`, default `587`)
 
 Also recommended:
 
 - `ALERT_EMAIL=chris@ridgewayroofingco.com` (this is already the code default)
 
-Optional SMS fallback (when email is unset or fails):
+SMS only when email is **not** configured (leave Twilio vars unset if you want email-only and a bad Twilio balance):
 
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`
 - Optional: `ALERT_PHONE=+19122440464`, `CONTACT_PHONE=(912) 244-0464`, `CONTACT_TEL=+19122440464`

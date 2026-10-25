@@ -4,13 +4,14 @@ Customer/driver messages: never auto-send. Live send only when env credentials
 are set AND the user clicks an explicit Send button in the UI.
 
 Exception: owner alert on new public /request submissions — automatic to Chris.
-Primary: email when RESEND_API_KEY or SMTP_* is set (ALERT_EMAIL).
-Fallback: SMS when Twilio is configured (ALERT_PHONE / CONTACT_TEL).
+When RESEND_API_KEY or SMTP_* is set: email-only to ALERT_EMAIL (no Twilio fallback).
+When email is not configured and Twilio is set: SMS to ALERT_PHONE / CONTACT_TEL.
 Never auto-emails customers.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import smtplib
 import urllib.parse
@@ -27,6 +28,8 @@ ALERT_EMAIL = (
 ).strip()
 SERVICE_AREA = "Pooler, GA 31322"
 BUSINESS_NAME = "Gopher Boys"
+
+log = logging.getLogger(__name__)
 
 
 def twilio_configured() -> bool:
@@ -279,17 +282,22 @@ def send_sms_twilio(to_address: str, body: str) -> tuple[bool, str]:
 
 
 def send_email(to_address: str, subject: str, plain: str, html: str | None = None) -> tuple[bool, str]:
-    """Send via Resend API or SMTP if configured."""
+    """Send via Resend API or SMTP if configured. Returns (ok, detail)."""
     if not email_configured():
         return False, "Email not configured"
 
     resend_key = os.environ.get("RESEND_API_KEY")
     if resend_key:
+        from_addr = (
+            os.environ.get("RESEND_FROM")
+            or os.environ.get("SMTP_FROM")
+            or "onboarding@resend.dev"
+        )
         try:
             from urllib.request import Request, urlopen
+            from urllib.error import HTTPError, URLError
             import json
 
-            from_addr = os.environ.get("SMTP_FROM") or os.environ.get("RESEND_FROM") or "onboarding@resend.dev"
             payload = json.dumps(
                 {
                     "from": from_addr,
@@ -310,9 +318,31 @@ def send_email(to_address: str, subject: str, plain: str, html: str | None = Non
             )
             with urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode())
-            return True, data.get("id", "sent")
+            detail = data.get("id", "sent")
+            log.info(
+                "Resend email ok to=%s from=%s id=%s",
+                to_address,
+                from_addr,
+                detail,
+            )
+            return True, detail
+        except HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode(errors="replace")
+            except Exception:  # noqa: BLE001
+                body = ""
+            detail = f"Resend HTTP {exc.code} from={from_addr} to={to_address}: {body or exc.reason}"
+            log.error("Resend email failed: %s", detail)
+            return False, detail
+        except URLError as exc:
+            detail = f"Resend network error from={from_addr} to={to_address}: {exc.reason}"
+            log.error("Resend email failed: %s", detail)
+            return False, detail
         except Exception as exc:  # noqa: BLE001
-            return False, str(exc)
+            detail = f"Resend error from={from_addr} to={to_address}: {exc}"
+            log.error("Resend email failed: %s", detail)
+            return False, detail
 
     host = os.environ["SMTP_HOST"]
     user = os.environ["SMTP_USER"]

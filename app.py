@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import csv
 import io
 import os
@@ -65,6 +66,8 @@ from suppliers import (
 from miles import calc_route_miles, ensure_geocode_cache_table
 
 app = Flask(__name__)
+
+log = logging.getLogger(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or "gopher-boys-crm-local-dev-key"
 
 # Public/business contact — centralized in messaging.py (env overrideable)
@@ -311,7 +314,12 @@ def _notify_owner_new_request(
     quote_amount: float | None,
     materials: str | None = None,
 ) -> tuple[bool, str]:
-    """Alert Chris about a new /request. Email primary, SMS fallback. Never raises."""
+    """Alert Chris about a new /request.
+
+    When Resend/SMTP is configured: email-only (never fall back to Twilio).
+    When email is not configured and Twilio is set: SMS only.
+    Never raises — job already saved.
+    """
     now = utcnow()
     ok, detail, channel, to_address, subject, body = (
         False,
@@ -322,8 +330,10 @@ def _notify_owner_new_request(
         "",
     )
 
-    # Primary: email (Resend or SMTP) when configured
     if email_configured():
+        # Email is the sole owner-alert channel when Resend/SMTP is set.
+        # Do not fall back to Twilio (avoids burning a negative SMS balance
+        # when email fails for from-address / domain / recipient reasons).
         channel = "email"
         to_address = ALERT_EMAIL
         subject, plain, html = build_owner_alert_email(
@@ -344,9 +354,22 @@ def _notify_owner_new_request(
             ok, detail = send_email(to_address, subject, plain, html)
         except Exception as exc:  # noqa: BLE001
             ok, detail = False, str(exc)
-
-    # Fallback: SMS when email not configured, or email send failed
-    if not ok and twilio_configured():
+        if not ok:
+            log.error(
+                "Owner alert email failed job_id=%s to=%s detail=%s "
+                "(Twilio SMS not attempted — email is configured)",
+                job_id,
+                to_address,
+                detail,
+            )
+        else:
+            log.info(
+                "Owner alert email sent job_id=%s to=%s detail=%s",
+                job_id,
+                to_address,
+                detail,
+            )
+    elif twilio_configured():
         channel = "sms"
         to_address = ALERT_PHONE
         body = build_owner_alert_sms(
@@ -365,8 +388,21 @@ def _notify_owner_new_request(
             ok, detail = send_sms_twilio(to_address, body)
         except Exception as exc:  # noqa: BLE001
             ok, detail = False, str(exc)
-
-    if not ok and not email_configured() and not twilio_configured():
+        if ok:
+            log.info(
+                "Owner alert SMS sent job_id=%s to=%s detail=%s",
+                job_id,
+                to_address,
+                detail,
+            )
+        else:
+            log.error(
+                "Owner alert SMS failed job_id=%s to=%s detail=%s",
+                job_id,
+                to_address,
+                detail,
+            )
+    else:
         detail = (
             "no alert channel configured "
             "(set RESEND_API_KEY or SMTP_* for email, or Twilio for SMS)"
@@ -382,10 +418,13 @@ def _notify_owner_new_request(
             quote_amount=quote_amount,
             job_id=job_id,
         )
-        # Prefer logging as email channel when ALERT_EMAIL is the intended path
-        channel = "email" if ALERT_EMAIL else "sms"
-        to_address = ALERT_EMAIL if channel == "email" else ALERT_PHONE
+        channel = "email"
+        to_address = ALERT_EMAIL
         subject = "Owner alert: new pickup request"
+        log.warning(
+            "Owner alert skipped job_id=%s — no email or Twilio configured",
+            job_id,
+        )
 
     status = "sent" if ok else "failed"
     log_body = body
@@ -420,7 +459,12 @@ def _notify_owner_new_request(
             add_activity(conn, job_id, note, None)
     except Exception:  # noqa: BLE001
         # Job already created; do not break the customer redirect
-        pass
+        log.exception(
+            "Owner alert DB log failed job_id=%s channel=%s ok=%s",
+            job_id,
+            channel,
+            ok,
+        )
 
     return ok, detail
 
@@ -545,7 +589,7 @@ def public_request():
             jid = cur.lastrowid
             add_activity(conn, jid, "Submitted via website", None)
 
-        # Owner alert to Chris (email primary, SMS fallback; never emails customer)
+        # Owner alert to Chris (email-only when Resend/SMTP set; else SMS; never emails customer)
         alert_ok, alert_detail = _notify_owner_new_request(
             contractor_id=cid,
             job_id=jid,
