@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Gopher Boys{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+</head>
+<body class="public-page">
+  <header class="public-hero">
+    <div class="public-hero-inner">
+      <a class="public-brand" href="{{ url_for('public_home') }}">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
+        <div>
+          <strong>GOPHER BOYS</strong>
+          <span>{{ SLOGAN }}</span>
+          <p class="public-tagline">Material pickup &amp; delivery · Based in {{ SERVICE_AREA }}</p>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <nav class="public-nav" aria-label="Main menu">
+    <a href="{{ url_for('public_home') }}" {% if request.endpoint == 'public_home' %}aria-current="page"{% endif %}>Home</a>
+    <a href="{{ url_for('public_request') }}" {% if request.endpoint == 'public_request' %}aria-current="page"{% endif %}>Request a pickup</a>
+    <a href="{{ url_for('public_request') }}#rates" {% if false %}aria-current="page"{% endif %}>Rates / calculator</a>
+    <a href="{{ url_for('public_about') }}" {% if request.endpoint == 'public_about' %}aria-current="page"{% endif %}>About us</a>
+    <a href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
+    {% if current_user %}
+    <a href="{{ url_for('dashboard') }}">Staff dashboard</a>
+    {% else %}
+    <a href="{{ url_for('login') }}" {% if request.endpoint == 'login' %}aria-current="page"{% endif %}>Staff login</a>
+    {% endif %}
+  </nav>
+
+  <main class="container public-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer-bar">
+    Based in <strong>{{ SERVICE_AREA }}</strong> ·
+    Contact <strong>{{ CONTACT_NAME }}</strong> —
+    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+    · <a href="{{ url_for('public_home') }}">Home</a>
+    · <a href="{{ url_for('public_request') }}">Request a pickup</a>
+    · <a href="{{ url_for('public_about') }}">About us</a>
+    · Staff: <a href="{{ url_for('login') }}">Login</a>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

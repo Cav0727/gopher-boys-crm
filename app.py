@@ -66,7 +66,7 @@ SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
 # Public endpoints that skip login
-PUBLIC_ENDPOINTS = {"login", "health", "static", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles"}
+PUBLIC_ENDPOINTS = {"login", "health", "static", "public_home", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles"}
 
 
 @app.context_processor
@@ -195,7 +195,7 @@ def login():
 def logout():
     session.clear()
     flash("You have been logged out.", "success")
-    return redirect(url_for("login"))
+    return redirect(url_for("public_home"))
 
 
 # ── Public customer request (no login) ─────────────────────────────────────
@@ -548,10 +548,19 @@ def user_edit(uid: int):
     return render_template("user_form.html", user=user, form=as_form(user))
 
 
-# ── Dashboard ──────────────────────────────────────────────────────────────
+# ── Public home (no login) ─────────────────────────────────────────────────
 
 
 @app.route("/")
+def public_home():
+    """Public landing with menu for customers and staff login link."""
+    return render_template("public_home.html")
+
+
+# ── Dashboard (staff) ──────────────────────────────────────────────────────
+
+
+@app.route("/dashboard")
 def dashboard():
     with db() as conn:
         counts = {

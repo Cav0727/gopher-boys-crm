@@ -1,42 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Request a Pickup — Gopher Boys</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
-</head>
-<body class="public-page">
-  <header class="public-hero">
-    <div class="public-hero-inner">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
-      <div>
-        <strong>GOPHER BOYS</strong>
-        <span>{{ SLOGAN }}</span>
-        <p class="public-tagline">Material pickup &amp; delivery · Based in {{ SERVICE_AREA }}</p>
-      </div>
-    </div>
-  </header>
-
-  <nav class="public-nav">
-    <a href="{{ url_for('public_request') }}" aria-current="page">Request a pickup</a>
-    <a href="{{ url_for('public_about') }}">About us</a>
-    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
-  </nav>
-
-  <main class="container public-main">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-wrap">
-          {% for cat, msg in messages %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
-
-    {% if errors %}
+{% extends "public_base.html" %}
+{% block title %}Request a Pickup — Gopher Boys{% endblock %}
+{% block content %}
+{% if errors %}
       <div class="flash error">
         {% for e in errors %}<div>{{ e }}</div>{% endfor %}
       </div>
@@ -60,7 +25,7 @@
     </div>
 
     <div class="grid grid-2" style="margin-bottom:1.25rem;align-items:start">
-      <div class="card">
+      <div class="card" id="rates">
         <h2>Delivery rates</h2>
         <p class="hint">One-way road miles: Pooler, GA 31322 → supplier → jobsite.</p>
         <div class="table-wrap">
@@ -220,16 +185,8 @@
         </p>
       </form>
     </div>
-  </main>
-
-  <footer class="footer-bar">
-    Based in <strong>{{ SERVICE_AREA }}</strong> ·
-    {{ CONTACT_NAME }} —
-    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
-    · <a href="{{ url_for('public_about') }}">About us</a>
-    · Staff login: <a href="{{ url_for('login') }}">Sign in</a>
-  </footer>
-
+{% endblock %}
+{% block scripts %}
   <script>
   const SUPPLIERS = {{ suppliers_json | tojson }};
   const ROUTE_API = {{ url_for('api_route_miles') | tojson }};
@@ -418,5 +375,4 @@
     scheduleRouteRefresh();
   }
   </script>
-</body>
-</html>
+{% endblock %}

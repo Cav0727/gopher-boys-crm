@@ -1,24 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Request received — Gopher Boys</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
-</head>
-<body class="public-page">
-  <header class="public-hero">
-    <div class="public-hero-inner">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
-      <div>
-        <strong>GOPHER BOYS</strong>
-        <span>{{ SLOGAN }}</span>
-      </div>
-    </div>
-  </header>
-
-  <main class="container public-main">
+{% extends "public_base.html" %}
+{% block title %}Request received — Gopher Boys{% endblock %}
+{% block content %}
     <div class="card thanks-card">
       <h1>Thanks — we got your request</h1>
       <p>
@@ -35,13 +17,7 @@
       <div class="form-actions">
         <a class="btn btn-mint" href="{{ url_for('public_request') }}">Submit another request</a>
         <a class="btn btn-outline" href="tel:+19127772339">Call now</a>
+        <a class="btn btn-outline" href="{{ url_for('public_home') }}">Home</a>
       </div>
     </div>
-  </main>
-
-  <footer class="footer-bar">
-    Based in <strong>{{ SERVICE_AREA }}</strong> · {{ SLOGAN }}
-    · <a href="{{ url_for('public_about') }}">About us</a>
-  </footer>
-</body>
-</html>
+{% endblock %}

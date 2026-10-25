@@ -56,9 +56,9 @@ On first boot (empty `users` table), two accounts are seeded with the same passw
 
 ## Multi-user accounts
 
-- Routes: `/login`, `/logout`, `/users` (admin), `/users/new`, `/users/<id>/edit`
+- Routes: `/` (public home + menu), `/login` (staff), `/logout`, `/dashboard` (staff), `/users` (admin), `/users/new`, `/users/<id>/edit`
 - Roles: `admin` (manage users) · `staff` (full CRM, no user admin)
-- All app routes require login except `/login`, `/request`, `/request/thanks`, `/about`, `/api/quote`, `/api/route-miles`, `/static/*`, and `/health`
+- All app routes require login except `/` (public home), `/login`, `/request`, `/request/thanks`, `/about`, `/api/quote`, `/api/route-miles`, `/static/*`, and `/health`. Staff dashboard is `/dashboard`. Customers never log in.
 - Jobs and contractors are **shared** company-wide (not per-user silos)
 - Activity notes record which user wrote them when available
 
