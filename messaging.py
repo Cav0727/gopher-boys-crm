@@ -3,8 +3,10 @@
 Customer/driver messages: never auto-send. Live send only when env credentials
 are set AND the user clicks an explicit Send button in the UI.
 
-Exception: owner alert SMS on new public /request submissions — automatic
-when Twilio is configured (ALERT_PHONE / CONTACT_TEL).
+Exception: owner alert on new public /request submissions — automatic to Chris.
+Primary: email when RESEND_API_KEY or SMTP_* is set (ALERT_EMAIL).
+Fallback: SMS when Twilio is configured (ALERT_PHONE / CONTACT_TEL).
+Never auto-emails customers.
 """
 
 from __future__ import annotations
@@ -20,6 +22,9 @@ CONTACT_NAME = os.environ.get("CONTACT_NAME") or "Chris Vincent"
 CONTACT_PHONE = os.environ.get("CONTACT_PHONE") or "(912) 244-0464"
 CONTACT_TEL = os.environ.get("CONTACT_TEL") or "+19122440464"
 ALERT_PHONE = os.environ.get("ALERT_PHONE") or CONTACT_TEL
+ALERT_EMAIL = (
+    os.environ.get("ALERT_EMAIL") or "chris@ridgewayroofingco.com"
+).strip()
 SERVICE_AREA = "Pooler, GA 31322"
 BUSINESS_NAME = "Gopher Boys"
 
@@ -83,6 +88,78 @@ def build_owner_alert_sms(
         f"Miles/quote: {miles_s} / {quote_s}",
     ]
     return "\n".join(lines)
+
+
+def build_owner_alert_email(
+    *,
+    company: str | None,
+    contact: str | None,
+    phone: str | None,
+    supplier: str | None,
+    jobsite: str | None,
+    email: str | None = None,
+    city: str | None = None,
+    miles: float | None = None,
+    quote_amount: float | None = None,
+    job_id: int | None = None,
+    materials: str | None = None,
+) -> tuple[str, str, str]:
+    """Return (subject, plain, html) for owner alert email on new /request."""
+    who_bits = [b for b in (company, contact) if b]
+    who = " / ".join(who_bits) if who_bits else "Unknown"
+    site = jobsite or "—"
+    if city:
+        site = f"{site}, {city}"
+    miles_s = f"{miles:.1f} mi" if miles is not None else "—"
+    quote_s = f"${quote_amount:.2f}" if quote_amount is not None else "TBD"
+    job_bit = f"#{job_id}" if job_id else "new"
+    subject = f"Gopher Boys — new pickup request {job_bit}"
+
+    lines = [
+        f"{BUSINESS_NAME} — new web pickup request",
+        "",
+        f"Job: {job_bit}",
+        f"Company / contact: {who}",
+        f"Phone: {phone or '—'}",
+        f"Email: {email or '—'}",
+        f"Supplier: {supplier or '—'}",
+        f"Jobsite: {site}",
+        f"Materials: {materials or '—'}",
+        f"Miles / quote: {miles_s} / {quote_s}",
+        "",
+        "Open the CRM Jobs → Request filter to review and confirm before dispatch.",
+        "This alert goes only to the owner — the customer was not emailed or texted.",
+        "",
+        f"— {BUSINESS_NAME} CRM",
+        SERVICE_AREA,
+    ]
+    plain = "\n".join(lines)
+
+    html = f"""<!DOCTYPE html>
+<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#1a2332;line-height:1.5">
+  <div style="max-width:560px;margin:0 auto;border:1px solid #d5dde8;border-radius:12px;overflow:hidden">
+    <div style="background:#0b1f3a;color:#fff;padding:1.25rem 1.5rem">
+      <h1 style="margin:0;font-size:1.35rem">{BUSINESS_NAME}</h1>
+      <p style="margin:0.35rem 0 0;opacity:0.85">New web pickup request</p>
+    </div>
+    <div style="padding:1.5rem">
+      <p><strong>Job:</strong> {job_bit}</p>
+      <p>
+        <strong>Company / contact:</strong> {who}<br>
+        <strong>Phone:</strong> {phone or '—'}<br>
+        <strong>Email:</strong> {email or '—'}<br>
+        <strong>Supplier:</strong> {supplier or '—'}<br>
+        <strong>Jobsite:</strong> {site}<br>
+        <strong>Materials:</strong> {materials or '—'}<br>
+        <strong>Miles / quote:</strong> {miles_s} / {quote_s}
+      </p>
+      <p style="color:#5a6a7e;font-size:0.9rem">
+        Review in CRM under Jobs → Request. Customer was not emailed or texted.
+      </p>
+    </div>
+  </div>
+</body></html>"""
+    return subject, plain, html
 
 
 def build_invoice(job: Any, contractor: Any) -> tuple[str, str, str]:

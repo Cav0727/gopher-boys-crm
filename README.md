@@ -50,13 +50,15 @@ On first boot (empty `users` table), two accounts are seeded with the same passw
 | `ADMIN_PASSWORD` | Recommended | Password for seeded Chris/Mack accounts on first boot. |
 | `DATABASE_PATH` | Optional | SQLite file path. Default: `data/gopher.db`. On Render disk use `/var/data/gopher.db`. |
 | `PORT` | Optional | Listen port. Default `5055` locally; hosts set `$PORT`. |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | **Required on Belmo for owner SMS alerts** | If all set: (1) auto-texts Chris on every successful `/request`, and (2) SMS drafts show a **Send via Twilio** button. Without them, jobs still save; the alert is stored as `failed` in `messages`. |
-| `ALERT_PHONE` | Optional | Owner alert destination. Default: `+19122440464` (Chris). |
+| `RESEND_API_KEY` | **Preferred for owner email alerts** | If set, new `/request` submissions auto-email Chris (owner alert). Also enables Send on invoice drafts. Free Resend tier works; use `onboarding@resend.dev` as from-address until a domain is verified, or set `RESEND_FROM` / `SMTP_FROM`. |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Optional (alt to Resend) | SMTP send for owner alerts + invoice drafts (`SMTP_PORT` default 587). |
+| `ALERT_EMAIL` | Optional | Owner alert email. Default: `chris@ridgewayroofingco.com`. |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | Optional SMS fallback | If email is not configured (or email send fails) and all Twilio vars are set: auto-texts Chris on `/request`, and SMS drafts show **Send via Twilio**. |
+| `ALERT_PHONE` | Optional | Owner SMS destination. Default: `+19122440464` (Chris). |
 | `CONTACT_PHONE` | Optional | Display phone. Default: `(912) 244-0464`. |
-| `CONTACT_TEL` | Optional | `tel:` href / E.164. Default: `+19122440464`. Used as alert destination when `ALERT_PHONE` unset. |
+| `CONTACT_TEL` | Optional | `tel:` href / E.164. Default: `+19122440464`. Used as SMS alert destination when `ALERT_PHONE` unset. |
 | `CONTACT_NAME` | Optional | Public contact name. Default: `Chris Vincent`. |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Optional | If set, email drafts can Send via SMTP (`SMTP_PORT` default 587). |
-| `RESEND_API_KEY` | Optional | Alternative to SMTP for sending invoice emails. |
+| `RESEND_FROM` | Optional | From-address for Resend (falls back to `SMTP_FROM`, then `onboarding@resend.dev`). |
 
 ## Multi-user accounts
 
@@ -85,7 +87,10 @@ Admins create users at **Users → New user**.
 - Message detail: **Mark sent** (after you text/email manually), **Copy**, **mailto:** link
 - Live **Send** only appears when Twilio / SMTP / Resend env vars are configured
 - **Customer / driver SMS:** never auto-send — Chris must click Send (or Mark sent)
-- **Owner alert exception:** every successful public `/request` auto-texts Chris at `ALERT_PHONE` (default `+19122440464`) when Twilio is configured
+- **Owner alert exception:** every successful public `/request` auto-notifies Chris:
+  - **Primary:** email to `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend or SMTP is configured
+  - **Fallback:** SMS to `ALERT_PHONE` when Twilio is configured
+  - If neither works, the job is still created and the thank-you page shows a clear flash to call Chris
 
 
 ## Public customer request
@@ -98,7 +103,8 @@ Admins create users at **Users → New user**.
 - Distance: prefer public **OSRM** driving miles; fallback Nominatim geocode + haversine × 1.3 road factor. Geocodes cached in SQLite `geocode_cache`. Nominatim User-Agent + 1 req/s throttle.
 - Shows flyer **rate card** + **quote calculator** (auto-filled miles + optional wait)
 - On submit: creates/links a **Contractor**, creates a Job with status **`request`**, activity note “Submitted via website”
-- **Owner SMS alert:** automatically texts Chris (`ALERT_PHONE` / default `+19122440464`) with company/contact, phone, supplier, jobsite, miles/quote. Stored in `messages` as `sent` or `failed`. Does **not** text the customer.
+- **Owner alert:** emails Chris at `ALERT_EMAIL` (default `chris@ridgewayroofingco.com`) when Resend/SMTP is set; otherwise texts `ALERT_PHONE` if Twilio is set. Includes company/contact, phone, customer email, supplier, jobsite, materials, miles/quote. Stored in `messages` as `sent` or `failed`. Does **not** email or text the customer.
+- If no alert channel works, job still saves and thank-you page flashes a clear “call us” warning
 - Customer SMS/email still never auto-send
 - Spam basics: honeypot field + per-IP rate limit (5 / 10 min)
 - Success page: thank-you + Chris’s phone **(912) 244-0464** for urgent needs
@@ -109,14 +115,23 @@ Admins create users at **Users → New user**.
 
 Live site is on Belmo free (`gopher-boys-crm-7fae.onbelmo.uk`). **Auto-deploy is OFF** — after pushing to `main`, redeploy manually in the Belmo dashboard. There is no Belmo CLI in this repo.
 
-**Belmo env vars for owner SMS alerts (required for live texts on `/request`):**
+**Belmo env vars for owner alerts on `/request` (email preferred — Twilio is optional fallback):**
 
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM` (Twilio number in E.164, e.g. `+1…`)
+Email (pick one path):
+
+- **Resend (easiest free tier):** `RESEND_API_KEY` = key from https://resend.com (free signup). Optional: `RESEND_FROM` or `SMTP_FROM` (default `onboarding@resend.dev` — Resend only delivers to the account owner email until a domain is verified).
+- **Or SMTP:** `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` (and optional `SMTP_PORT`, default `587`)
+
+Also recommended:
+
+- `ALERT_EMAIL=chris@ridgewayroofingco.com` (this is already the code default)
+
+Optional SMS fallback (when email is unset or fails):
+
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`
 - Optional: `ALERT_PHONE=+19122440464`, `CONTACT_PHONE=(912) 244-0464`, `CONTACT_TEL=+19122440464`
 
-Without Twilio, requests still create jobs; the owner alert is logged as a failed message for staff. Do not invent or commit Twilio credentials.
+Without email or Twilio, requests still create jobs; thank-you shows a flash to call Chris, and the alert is logged as `failed` in Messages. Do not invent or commit API keys. Auto-deploy is OFF — set env vars, then **manual Redeploy** after pushing `main`.
 
 ## Features
 

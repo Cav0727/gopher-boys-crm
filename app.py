@@ -36,12 +36,14 @@ from db import (
     utcnow,
 )
 from messaging import (
+    ALERT_EMAIL,
     ALERT_PHONE,
     CONTACT_NAME,
     CONTACT_PHONE,
     CONTACT_TEL,
     build_driver_dispatch_sms,
     build_invoice,
+    build_owner_alert_email,
     build_owner_alert_sms,
     default_sms_body,
     email_configured,
@@ -296,41 +298,100 @@ def _find_or_create_contractor(conn, company: str, contact: str, phone: str, ema
 
 
 def _notify_owner_new_request(
-    *,
     contractor_id: int,
     job_id: int,
     company: str | None,
     contact: str | None,
     phone: str | None,
+    email: str | None,
     supplier: str | None,
     job_address: str | None,
     city: str | None,
     miles: float | None,
     quote_amount: float | None,
-) -> None:
-    """Text Chris about a new /request. Never raises — job already saved."""
-    body = build_owner_alert_sms(
-        company=company,
-        contact=contact,
-        phone=phone,
-        supplier=supplier,
-        jobsite=job_address,
-        city=city,
-        miles=miles,
-        quote_amount=quote_amount,
-        job_id=job_id,
-    )
-    to_address = ALERT_PHONE
+    materials: str | None = None,
+) -> tuple[bool, str]:
+    """Alert Chris about a new /request. Email primary, SMS fallback. Never raises."""
     now = utcnow()
-    ok, detail = False, "not attempted"
-    try:
-        ok, detail = send_sms_twilio(to_address, body)
-    except Exception as exc:  # noqa: BLE001
-        ok, detail = False, str(exc)
+    ok, detail, channel, to_address, subject, body = (
+        False,
+        "no alert channel configured",
+        "email",
+        ALERT_EMAIL,
+        "Owner alert: new pickup request",
+        "",
+    )
+
+    # Primary: email (Resend or SMTP) when configured
+    if email_configured():
+        channel = "email"
+        to_address = ALERT_EMAIL
+        subject, plain, html = build_owner_alert_email(
+            company=company,
+            contact=contact,
+            phone=phone,
+            email=email,
+            supplier=supplier,
+            jobsite=job_address,
+            city=city,
+            miles=miles,
+            quote_amount=quote_amount,
+            job_id=job_id,
+            materials=materials,
+        )
+        body = plain
+        try:
+            ok, detail = send_email(to_address, subject, plain, html)
+        except Exception as exc:  # noqa: BLE001
+            ok, detail = False, str(exc)
+
+    # Fallback: SMS when email not configured, or email send failed
+    if not ok and twilio_configured():
+        channel = "sms"
+        to_address = ALERT_PHONE
+        body = build_owner_alert_sms(
+            company=company,
+            contact=contact,
+            phone=phone,
+            supplier=supplier,
+            jobsite=job_address,
+            city=city,
+            miles=miles,
+            quote_amount=quote_amount,
+            job_id=job_id,
+        )
+        subject = "Owner alert: new pickup request"
+        try:
+            ok, detail = send_sms_twilio(to_address, body)
+        except Exception as exc:  # noqa: BLE001
+            ok, detail = False, str(exc)
+
+    if not ok and not email_configured() and not twilio_configured():
+        detail = (
+            "no alert channel configured "
+            "(set RESEND_API_KEY or SMTP_* for email, or Twilio for SMS)"
+        )
+        body = build_owner_alert_sms(
+            company=company,
+            contact=contact,
+            phone=phone,
+            supplier=supplier,
+            jobsite=job_address,
+            city=city,
+            miles=miles,
+            quote_amount=quote_amount,
+            job_id=job_id,
+        )
+        # Prefer logging as email channel when ALERT_EMAIL is the intended path
+        channel = "email" if ALERT_EMAIL else "sms"
+        to_address = ALERT_EMAIL if channel == "email" else ALERT_PHONE
+        subject = "Owner alert: new pickup request"
+
     status = "sent" if ok else "failed"
+    log_body = body
     if not ok:
-        # Keep failure reason visible to staff in Messages
-        body = f"{body}\n\n[ALERT FAILED: {detail}]"
+        log_body = f"{body}\n\n[ALERT FAILED: {detail}]"
+
     try:
         with db() as conn:
             conn.execute(
@@ -338,28 +399,30 @@ def _notify_owner_new_request(
                 INSERT INTO messages
                     (contractor_id, job_id, channel, to_address, subject, body,
                      status, created_by, created_at, sent_at)
-                VALUES (?, ?, 'sms', ?, ?, ?, ?, NULL, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
                 (
                     contractor_id,
                     job_id,
+                    channel,
                     to_address,
-                    "Owner alert: new pickup request",
-                    body,
+                    subject,
+                    log_body,
                     status,
                     now,
                     now if ok else None,
                 ),
             )
-            note = (
-                f"Owner alert SMS sent to {to_address}"
-                if ok
-                else f"Owner alert SMS failed ({detail})"
-            )
+            if ok:
+                note = f"Owner alert {channel} sent to {to_address}"
+            else:
+                note = f"Owner alert {channel} failed ({detail})"
             add_activity(conn, job_id, note, None)
     except Exception:  # noqa: BLE001
         # Job already created; do not break the customer redirect
         pass
+
+    return ok, detail
 
 
 @app.route("/request", methods=["GET", "POST"])
@@ -482,19 +545,27 @@ def public_request():
             jid = cur.lastrowid
             add_activity(conn, jid, "Submitted via website", None)
 
-        # Owner alert SMS to Chris (automatic; not a customer message)
-        _notify_owner_new_request(
+        # Owner alert to Chris (email primary, SMS fallback; never emails customer)
+        alert_ok, alert_detail = _notify_owner_new_request(
             contractor_id=cid,
             job_id=jid,
             company=company,
             contact=contact,
             phone=phone,
+            email=email,
             supplier=supplier,
             job_address=job_address,
             city=city,
             miles=miles,
             quote_amount=quote_amount,
+            materials=materials,
         )
+        if not alert_ok:
+            flash(
+                "Your request was saved. We could not send the automatic staff alert "
+                f"({alert_detail}). Please also call {CONTACT_PHONE} so we don't miss it.",
+                "error",
+            )
 
         return redirect(url_for("public_request_thanks"))
 
