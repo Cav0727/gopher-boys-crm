@@ -136,6 +136,14 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
             CREATE INDEX IF NOT EXISTS idx_messages_contractor ON messages(contractor_id);
             CREATE INDEX IF NOT EXISTS idx_drivers_active ON drivers(is_active);
+
+            CREATE TABLE IF NOT EXISTS geocode_cache (
+                query TEXT PRIMARY KEY,
+                lat REAL NOT NULL,
+                lon REAL NOT NULL,
+                source TEXT,
+                created_at TEXT NOT NULL
+            );
             """
         )
 

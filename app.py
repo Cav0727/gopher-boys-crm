@@ -47,6 +47,15 @@ from messaging import (
     twilio_configured,
 )
 from pricing import RATE_TABLE, calc_delivery_quote, calc_wait_fee
+from suppliers import (
+    BASE_ADDRESS,
+    get_supplier,
+    supplier_label,
+    supplier_payload_for_js,
+    suppliers_by_category,
+    full_address,
+)
+from miles import calc_route_miles, ensure_geocode_cache_table
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or "gopher-boys-crm-local-dev-key"
@@ -57,7 +66,7 @@ SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
 # Public endpoints that skip login
-PUBLIC_ENDPOINTS = {"login", "health", "static", "public_request", "public_request_thanks", "api_quote"}
+PUBLIC_ENDPOINTS = {"login", "health", "static", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles"}
 
 
 @app.context_processor
@@ -285,6 +294,19 @@ def public_request():
     """Customer-facing pickup/delivery request — no login required."""
     form = {}
     errors = []
+    supplier_groups = suppliers_by_category()
+
+    def _render(form_data, errs=None):
+        return render_template(
+            "public_request.html",
+            form=form_data,
+            errors=errs or [],
+            rate_table=RATE_TABLE,
+            supplier_groups=supplier_groups,
+            suppliers_json=supplier_payload_for_js(),
+            base_address=BASE_ADDRESS,
+        )
+
     if request.method == "POST":
         # Honeypot: bots fill "website_url"; humans leave blank
         if _f("website_url"):
@@ -295,19 +317,14 @@ def public_request():
                 "or call us at " + CONTACT_PHONE + ".",
                 "error",
             )
-            form = as_form(request.form)
-            return render_template(
-                "public_request.html",
-                form=form,
-                errors=errors,
-                rate_table=RATE_TABLE,
-            )
+            return _render(as_form(request.form))
 
         company = _f("company_name")
         contact = _f("contact_name")
         phone = _f("phone")
         email = _f("email")
-        supplier = _f("supplier")
+        supplier_id = _f("supplier_id") or "other"
+        supplier_other = _f("supplier_other")
         job_address = _f("job_address")
         city = _f("city")
         materials = _f("materials")
@@ -315,29 +332,47 @@ def public_request():
         miles = _float("miles")
         notes = _f("notes")
 
+        # Resolve supplier label + address for CRM storage
+        known = get_supplier(supplier_id)
+        if known:
+            supplier = supplier_label(known)
+            pickup_for_miles = full_address(known)
+        else:
+            supplier = supplier_other
+            pickup_for_miles = supplier_other
+
+        # Server-side miles: Pooler → supplier → jobsite (even if JS failed)
+        route = calc_route_miles(
+            supplier_id=supplier_id if known else None,
+            supplier_address=pickup_for_miles,
+            jobsite_address=job_address,
+        )
+        if route.get("ok") and route.get("miles") is not None:
+            miles = float(route["miles"])
+        quote_amount = None
+        q = calc_delivery_quote(miles)
+        if q.get("ok") and q.get("amount") is not None:
+            quote_amount = q["amount"]
+
         if not phone:
             errors.append("Phone number is required.")
         if not job_address:
             errors.append("Jobsite / delivery address is required.")
         if not supplier:
-            errors.append("Supplier / pickup location is required.")
+            errors.append("Pick a supplier from the list, or choose Other and enter an address.")
         if not (company or contact):
             errors.append("Company or contact name is required.")
 
         if errors:
-            form = as_form(request.form)
-            return render_template(
-                "public_request.html",
-                form=form,
-                errors=errors,
-                rate_table=RATE_TABLE,
-            )
+            return _render(as_form(request.form), errors)
 
         note_parts = []
         if notes:
             note_parts.append(notes)
         if preferred:
             note_parts.append(f"Preferred date/time: {preferred}")
+        if route.get("detail"):
+            note_parts.append(f"Route miles: {route['detail']}")
         job_notes = "\n".join(note_parts) if note_parts else ""
 
         now = utcnow()
@@ -352,7 +387,7 @@ def public_request():
                     notes, driver_id, materials, created_at, updated_at
                 ) VALUES (
                     ?, ?, '', ?, ?,
-                    ?, NULL, 0, 0,
+                    ?, ?, 0, 0,
                     '', 'request', ?, NULL,
                     ?, NULL, ?, ?, ?
                 )
@@ -363,6 +398,7 @@ def public_request():
                     job_address,
                     city or None,
                     miles,
+                    quote_amount,
                     preferred or None,
                     job_notes or None,
                     materials or None,
@@ -375,17 +411,46 @@ def public_request():
 
         return redirect(url_for("public_request_thanks"))
 
-    return render_template(
-        "public_request.html",
-        form=form,
-        errors=errors,
-        rate_table=RATE_TABLE,
-    )
+    return _render(form, errors)
 
 
 @app.route("/request/thanks")
 def public_request_thanks():
     return render_template("public_request_thanks.html")
+
+
+@app.route("/about")
+def public_about():
+    """Public About / Vision page — no login."""
+    return render_template("public_about.html")
+
+
+@app.route("/api/route-miles", methods=["GET", "POST"])
+def api_route_miles():
+    """Estimate one-way miles: Pooler → supplier → jobsite."""
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        supplier_id = (data.get("supplier_id") or "").strip() or None
+        supplier_address = (data.get("supplier_address") or "").strip() or None
+        jobsite = (data.get("jobsite") or data.get("job_address") or "").strip() or None
+    else:
+        supplier_id = (request.args.get("supplier_id") or "").strip() or None
+        supplier_address = (request.args.get("supplier_address") or "").strip() or None
+        jobsite = (
+            request.args.get("jobsite")
+            or request.args.get("job_address")
+            or ""
+        ).strip() or None
+
+    route = calc_route_miles(
+        supplier_id=supplier_id,
+        supplier_address=supplier_address,
+        jobsite_address=jobsite,
+    )
+    quote = calc_delivery_quote(route.get("miles"))
+    return jsonify({"route": route, "quote": quote})
+
+
 
 
 # ── Users (admin) ──────────────────────────────────────────────────────────
@@ -1550,6 +1615,7 @@ def export_jobs():
 
 
 init_db()
+ensure_geocode_cache_table()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5055"))

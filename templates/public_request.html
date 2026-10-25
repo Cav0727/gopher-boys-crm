@@ -19,6 +19,12 @@
     </div>
   </header>
 
+  <nav class="public-nav">
+    <a href="{{ url_for('public_request') }}" aria-current="page">Request a pickup</a>
+    <a href="{{ url_for('public_about') }}">About us</a>
+    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+  </nav>
+
   <main class="container public-main">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -39,15 +45,24 @@
     <div class="page-header">
       <h1>Request a pickup</h1>
       <p class="muted" style="margin:0;max-width:36rem">
-        Tell us where to pick up and where to deliver. We’ll confirm price and timing before we roll —
+        Pick your supplier, enter the jobsite, and we’ll estimate miles from
+        <strong>Pooler → supplier → delivery</strong>. We’ll confirm price and timing before we roll —
         no spam, no auto texts.
+      </p>
+    </div>
+
+    <div class="card about-blurb">
+      <p style="margin:0">
+        <strong>Gopher Boys</strong> handles supplier runs so Coastal Georgia contractors keep building.
+        Based in {{ SERVICE_AREA }}.
+        <a href="{{ url_for('public_about') }}">About us &amp; our vision →</a>
       </p>
     </div>
 
     <div class="grid grid-2" style="margin-bottom:1.25rem;align-items:start">
       <div class="card">
         <h2>Delivery rates</h2>
-        <p class="hint">One-way road miles from Pooler, GA 31322 (supplier → jobsite).</p>
+        <p class="hint">One-way road miles: Pooler, GA 31322 → supplier → jobsite.</p>
         <div class="table-wrap">
           <table class="rate-table">
             <thead><tr><th>Distance</th><th>Price</th></tr></thead>
@@ -72,10 +87,10 @@
 
       <div class="card quote-card">
         <h2>Quick quote calculator</h2>
-        <p class="hint">Estimate your price — then send the request below.</p>
+        <p class="hint">Miles auto-fill when you pick a supplier and enter a jobsite below.</p>
         <div class="form-grid">
           <div class="form-group">
-            <label for="calc-miles">One-way miles</label>
+            <label for="calc-miles">One-way miles (Pooler → supplier → job)</label>
             <input type="number" id="calc-miles" min="0" step="0.1" placeholder="e.g. 18">
           </div>
           <div class="form-group">
@@ -87,6 +102,7 @@
           <div class="price" id="calc-price"></div>
           <div class="hint" id="calc-detail"></div>
         </div>
+        <div id="route-status" class="hint route-status" aria-live="polite"></div>
         <div class="form-actions">
           <button type="button" class="btn btn-mint" id="calc-btn">Calculate</button>
           <button type="button" class="btn btn-outline" id="calc-use-miles">Use miles in form ↓</button>
@@ -124,11 +140,36 @@
             <input id="email" name="email" type="email" value="{{ form.get('email','') }}"
                    placeholder="you@company.com" autocomplete="email">
           </div>
+
           <div class="form-group full">
-            <label for="supplier">Supplier / pickup location *</label>
-            <input id="supplier" name="supplier" required value="{{ form.get('supplier','') }}"
-                   placeholder="Yard name or full pickup address">
+            <label for="supplier_id">Supplier / pickup location *</label>
+            <select id="supplier_id" name="supplier_id" required>
+              <option value="">Select a supply company…</option>
+              {% for cat, items in supplier_groups %}
+              <optgroup label="{{ cat }}">
+                {% for s in items %}
+                <option value="{{ s.id }}"
+                  data-address="{{ s.street }}, {{ s.city }}, {{ s.state }} {{ s.zip }}"
+                  {% if form.get('supplier_id') == s.id %}selected{% endif %}>
+                  {{ s.name }} — {{ s.city }}, {{ s.state }}
+                </option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+              <option value="other" {% if form.get('supplier_id') == 'other' %}selected{% endif %}>
+                Other / not listed — enter address below
+              </option>
+            </select>
+            <p class="hint" id="supplier-address-hint" style="margin:0.35rem 0 0"></p>
           </div>
+
+          <div class="form-group full" id="supplier-other-wrap" hidden>
+            <label for="supplier_other">Other supplier name &amp; full address *</label>
+            <input id="supplier_other" name="supplier_other"
+                   value="{{ form.get('supplier_other','') }}"
+                   placeholder="Yard name, street, city, state, ZIP">
+          </div>
+
           <div class="form-group full">
             <label for="job_address">Jobsite / delivery address *</label>
             <input id="job_address" name="job_address" required value="{{ form.get('job_address','') }}"
@@ -140,9 +181,13 @@
                    placeholder="e.g. Savannah, GA">
           </div>
           <div class="form-group">
-            <label for="miles">One-way miles (if known)</label>
+            <label for="miles">Estimated one-way miles</label>
             <input id="miles" name="miles" type="number" min="0" step="0.1"
-                   value="{{ form.get('miles','') }}" placeholder="Optional">
+                   value="{{ form.get('miles','') }}"
+                   placeholder="Auto-calculated" readonly>
+            <p class="hint" style="margin:0.25rem 0 0">
+              Pooler base → supplier → jobsite. Recalculated on submit for the CRM quote.
+            </p>
           </div>
           <div class="form-group full">
             <label for="materials">Materials description</label>
@@ -159,6 +204,10 @@
             <textarea id="notes" name="notes"
               placeholder="Gate codes, contact on site, anything else we should know">{{ form.get('notes','') }}</textarea>
           </div>
+        </div>
+        <div id="form-quote-preview" class="quote-result" style="display:none;margin:1rem 0">
+          <div class="price" id="form-quote-price"></div>
+          <div class="hint" id="form-quote-detail"></div>
         </div>
         <div class="form-actions">
           <button class="btn btn-mint" type="submit">Submit request</button>
@@ -177,11 +226,13 @@
     Based in <strong>{{ SERVICE_AREA }}</strong> ·
     {{ CONTACT_NAME }} —
     <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+    · <a href="{{ url_for('public_about') }}">About us</a>
     · Staff login: <a href="{{ url_for('login') }}">Sign in</a>
   </footer>
 
   <script>
-  // Client-side quote (same rules as pricing.py) — no login needed
+  const SUPPLIERS = {{ suppliers_json | tojson }};
+  const ROUTE_API = {{ url_for('api_route_miles') | tojson }};
   const BASE_MILES = 10, BASE_PRICE = 110, PER_MILE = 3, MAX_AUTO = 30, WAIT_BLOCK = 15, WAIT_FEE = 20;
 
   function calcLocal(miles, waitExtra) {
@@ -234,6 +285,114 @@
     }
   }
 
+  function showFormQuote(miles) {
+    const box = document.getElementById('form-quote-preview');
+    const price = document.getElementById('form-quote-price');
+    const detail = document.getElementById('form-quote-detail');
+    const r = calcLocal(miles, 0);
+    if (!r) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    if (r.custom) {
+      price.textContent = 'Custom quote';
+      detail.textContent = r.detail;
+    } else if (r.ok) {
+      price.textContent = 'Est. $' + Number(r.total).toFixed(2);
+      detail.textContent = r.detail + ' · Confirmed before dispatch';
+    } else {
+      price.textContent = r.label || '—';
+      detail.textContent = r.detail || '';
+    }
+  }
+
+  function selectedSupplier() {
+    const id = document.getElementById('supplier_id').value;
+    if (!id || id === 'other') return null;
+    return SUPPLIERS.find(s => s.id === id) || null;
+  }
+
+  function syncSupplierUI() {
+    const sel = document.getElementById('supplier_id');
+    const otherWrap = document.getElementById('supplier-other-wrap');
+    const otherInput = document.getElementById('supplier_other');
+    const hint = document.getElementById('supplier-address-hint');
+    const isOther = sel.value === 'other';
+    otherWrap.hidden = !isOther;
+    otherInput.required = isOther;
+    const s = selectedSupplier();
+    if (s) {
+      hint.textContent = 'Pickup: ' + s.address;
+    } else if (isOther) {
+      hint.textContent = 'Enter the full pickup address so we can calculate miles.';
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  let routeTimer = null;
+  let routeAbort = null;
+
+  async function refreshRouteMiles() {
+    const status = document.getElementById('route-status');
+    const milesInput = document.getElementById('miles');
+    const calcMiles = document.getElementById('calc-miles');
+    const sel = document.getElementById('supplier_id');
+    const jobsite = (document.getElementById('job_address').value || '').trim();
+    const other = (document.getElementById('supplier_other').value || '').trim();
+
+    let supplier_id = sel.value || null;
+    let supplier_address = null;
+    if (!supplier_id) {
+      status.textContent = '';
+      return;
+    }
+    if (supplier_id === 'other') {
+      supplier_id = null;
+      supplier_address = other;
+      if (!supplier_address || !jobsite) {
+        status.textContent = jobsite ? 'Enter the other supplier address to estimate miles.' : '';
+        return;
+      }
+    } else {
+      const s = selectedSupplier();
+      supplier_address = s ? s.address : null;
+      if (!jobsite) {
+        status.textContent = 'Enter the jobsite address to estimate miles.';
+        return;
+      }
+    }
+
+    status.textContent = 'Calculating miles (Pooler → supplier → jobsite)…';
+    if (routeAbort) routeAbort.abort();
+    routeAbort = new AbortController();
+    try {
+      const res = await fetch(ROUTE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ supplier_id, supplier_address, jobsite }),
+        signal: routeAbort.signal,
+      });
+      const data = await res.json();
+      const route = data.route || {};
+      if (route.ok && route.miles != null) {
+        milesInput.value = route.miles;
+        calcMiles.value = route.miles;
+        status.textContent = (route.approx ? 'Approx: ' : '') + (route.detail || (route.miles + ' mi'));
+        showCalc();
+        showFormQuote(route.miles);
+      } else {
+        status.textContent = route.detail || 'Could not estimate miles yet.';
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      status.textContent = 'Miles estimate unavailable — we will calculate on submit.';
+    }
+  }
+
+  function scheduleRouteRefresh() {
+    clearTimeout(routeTimer);
+    routeTimer = setTimeout(refreshRouteMiles, 450);
+  }
+
   document.getElementById('calc-btn').addEventListener('click', showCalc);
   document.getElementById('calc-miles').addEventListener('change', showCalc);
   document.getElementById('calc-wait').addEventListener('change', showCalc);
@@ -242,9 +401,22 @@
     if (m !== '') {
       document.getElementById('miles').value = m;
       document.getElementById('miles').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      document.getElementById('miles').focus();
+      showFormQuote(m);
     }
   });
+
+  document.getElementById('supplier_id').addEventListener('change', function() {
+    syncSupplierUI();
+    scheduleRouteRefresh();
+  });
+  document.getElementById('supplier_other').addEventListener('input', scheduleRouteRefresh);
+  document.getElementById('job_address').addEventListener('input', scheduleRouteRefresh);
+  document.getElementById('job_address').addEventListener('change', scheduleRouteRefresh);
+
+  syncSupplierUI();
+  if (document.getElementById('job_address').value && document.getElementById('supplier_id').value) {
+    scheduleRouteRefresh();
+  }
   </script>
 </body>
 </html>
