@@ -75,7 +75,7 @@ SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
 # Public endpoints that skip login
-PUBLIC_ENDPOINTS = {"login", "health", "static", "public_home", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles", "api_address_suggest"}
+PUBLIC_ENDPOINTS = {"login", "health", "static", "public_home", "public_request", "public_request_thanks", "public_about", "api_quote", "api_route_miles", "api_address_suggest", "api_build_info"}
 
 
 @app.context_processor
@@ -168,9 +168,23 @@ def _float(name: str, default: float | None = None) -> float | None:
 # ── Health (for hosts) ─────────────────────────────────────────────────────
 
 
+# Bump when shipping jobsite/miles fixes — Belmo has no auto-deploy; use /api/build-info to verify.
+BUILD_ID = "jobsite-state-1"
+
 @app.route("/health")
 def health():
     return "ok", 200
+
+
+@app.route("/api/build-info")
+def api_build_info():
+    """Public marker so we can confirm Belmo redeployed the latest miles/state fix."""
+    return jsonify({
+        "ok": True,
+        "build": BUILD_ID,
+        "jobsite_state": True,
+        "address_suggest": True,
+    })
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
@@ -507,6 +521,7 @@ def public_request():
         supplier_other = _f("supplier_other")
         job_address = _f("job_address")
         city = _f("city")
+        state = (_f("state") or "GA").upper()[:2]
         materials = _f("materials")
         preferred = _f("preferred_at")
         miles = _float("miles")
@@ -524,7 +539,7 @@ def public_request():
             pickup_for_miles = supplier_other
 
         # Server-side miles: Pooler → supplier → jobsite (even if JS failed).
-        # Prefer autocomplete lat/lon when present so Coastal GA geocode is not ambiguous.
+        # Prefer autocomplete lat/lon when present; always include state (default GA).
         route = calc_route_miles(
             supplier_id=supplier_id if known else None,
             supplier_address=pickup_for_miles,
@@ -532,6 +547,7 @@ def public_request():
             jobsite_lat=job_lat,
             jobsite_lon=job_lon,
             jobsite_city=city,
+            jobsite_state=state,
         )
         if route.get("ok") and route.get("miles") is not None:
             miles = float(route["miles"])
@@ -567,12 +583,12 @@ def public_request():
             cur = conn.execute(
                 """
                 INSERT INTO jobs (
-                    contractor_id, supplier, order_ref, job_address, city,
+                    contractor_id, supplier, order_ref, job_address, city, state,
                     miles, quote_amount, wait_minutes_extra, wait_fee,
                     extra_stops_notes, status, scheduled_at, delivered_at,
                     notes, driver_id, materials, created_at, updated_at
                 ) VALUES (
-                    ?, ?, '', ?, ?,
+                    ?, ?, '', ?, ?, ?,
                     ?, ?, 0, 0,
                     '', 'request', ?, NULL,
                     ?, NULL, ?, ?, ?
@@ -583,6 +599,7 @@ def public_request():
                     supplier,
                     job_address,
                     city or None,
+                    state or "GA",
                     miles,
                     quote_amount,
                     preferred or None,
@@ -642,6 +659,7 @@ def api_route_miles():
         supplier_address = (data.get("supplier_address") or "").strip() or None
         jobsite = (data.get("jobsite") or data.get("job_address") or "").strip() or None
         jobsite_city = (data.get("city") or data.get("jobsite_city") or "").strip() or None
+        jobsite_state = (data.get("state") or data.get("jobsite_state") or "").strip() or None
         jobsite_lat = data.get("jobsite_lat") or data.get("lat")
         jobsite_lon = data.get("jobsite_lon") or data.get("lon")
     else:
@@ -653,6 +671,7 @@ def api_route_miles():
             or ""
         ).strip() or None
         jobsite_city = (request.args.get("city") or request.args.get("jobsite_city") or "").strip() or None
+        jobsite_state = (request.args.get("state") or request.args.get("jobsite_state") or "").strip() or None
         jobsite_lat = request.args.get("jobsite_lat") or request.args.get("lat")
         jobsite_lon = request.args.get("jobsite_lon") or request.args.get("lon")
 
@@ -663,6 +682,7 @@ def api_route_miles():
         jobsite_lat=jobsite_lat,
         jobsite_lon=jobsite_lon,
         jobsite_city=jobsite_city,
+        jobsite_state=jobsite_state,
     )
     quote = calc_delivery_quote(route.get("miles"))
     return jsonify({"route": route, "quote": quote})
@@ -1121,6 +1141,7 @@ def _save_job_fields(existing_id: int | None = None):
         "order_ref": _f("order_ref"),
         "job_address": _f("job_address"),
         "city": _f("city"),
+        "state": (_f("state") or "GA").upper()[:2],
         "miles": miles,
         "quote_amount": quote_amount,
         "wait_minutes_extra": wait_extra,
@@ -1194,12 +1215,12 @@ def job_new():
             cur = conn.execute(
                 """
                 INSERT INTO jobs (
-                    contractor_id, supplier, order_ref, job_address, city,
+                    contractor_id, supplier, order_ref, job_address, city, state,
                     miles, quote_amount, wait_minutes_extra, wait_fee,
                     extra_stops_notes, status, scheduled_at, delivered_at,
                     notes, driver_id, materials, created_at, updated_at
                 ) VALUES (
-                    :contractor_id, :supplier, :order_ref, :job_address, :city,
+                    :contractor_id, :supplier, :order_ref, :job_address, :city, :state,
                     :miles, :quote_amount, :wait_minutes_extra, :wait_fee,
                     :extra_stops_notes, :status, :scheduled_at, :delivered_at,
                     :notes, :driver_id, :materials, :created_at, :updated_at
@@ -1339,7 +1360,7 @@ def job_edit(jid: int):
                 """
                 UPDATE jobs SET
                     contractor_id=:contractor_id, supplier=:supplier,
-                    order_ref=:order_ref, job_address=:job_address, city=:city,
+                    order_ref=:order_ref, job_address=:job_address, city=:city, state=:state,
                     miles=:miles, quote_amount=:quote_amount,
                     wait_minutes_extra=:wait_minutes_extra, wait_fee=:wait_fee,
                     extra_stops_notes=:extra_stops_notes, status=:status,
@@ -1887,6 +1908,7 @@ def export_jobs():
         "order_ref",
         "job_address",
         "city",
+        "state",
         "miles",
         "quote_amount",
         "wait_minutes_extra",

@@ -5,10 +5,11 @@
  * attachAddressAutocomplete({
  *   input: '#job_address' | HTMLElement,
  *   cityInput: '#city' | HTMLElement | null,
+ *   stateInput: '#state' | HTMLElement | null,
  *   latInput: '#job_lat' | HTMLElement | null,
  *   lonInput: '#job_lon' | HTMLElement | null,
  *   apiUrl: '/api/address-suggest',
- *   debounceMs: 300,
+ *   debounceMs: 400,
  *   onSelect: function(suggestion) {}
  * })
  */
@@ -27,6 +28,7 @@
     if (!input) return null;
 
     var cityInput = el(opts.cityInput);
+    var stateInput = el(opts.stateInput);
     var latInput = el(opts.latInput);
     var lonInput = el(opts.lonInput);
     var apiUrl = opts.apiUrl || '/api/address-suggest';
@@ -70,18 +72,40 @@
 
     function applySuggestion(s) {
       suppress = true;
-      // Full formatted address so miles geocode stays Coastal GA even if coords drop
-      var formatted = (s.formatted || s.display || '').trim();
+      // Street in address; city + state in their own fields (miles composes all three)
       var street = (s.street || '').trim();
-      input.value = formatted || street;
+      var formatted = (s.formatted || s.display || '').trim();
+      input.value = street || formatted;
 
       if (cityInput) {
-        var cityParts = [];
-        if (s.city) cityParts.push(s.city);
-        if (s.state) cityParts.push(s.state);
-        var cityVal = cityParts.join(', ');
-        if (s.zip) cityVal = (cityVal ? cityVal + ' ' : '') + s.zip;
+        var cityVal = (s.city || '').trim();
+        if (s.zip && cityVal && cityVal.indexOf(s.zip) < 0) {
+          cityVal = cityVal + ' ' + s.zip;
+        } else if (s.zip && !cityVal) {
+          cityVal = s.zip;
+        }
         if (cityVal) cityInput.value = cityVal;
+      }
+
+      if (stateInput && s.state) {
+        var st = String(s.state).trim().toUpperCase();
+        if (st.length > 2) {
+          var map = { GEORGIA: 'GA', 'SOUTH CAROLINA': 'SC', FLORIDA: 'FL',
+                      'NORTH CAROLINA': 'NC', ALABAMA: 'AL', TENNESSEE: 'TN' };
+          st = map[st] || st.slice(0, 2);
+        }
+        // Prefer matching <select> option; otherwise set value
+        var matched = false;
+        if (stateInput.tagName === 'SELECT') {
+          for (var i = 0; i < stateInput.options.length; i++) {
+            if (stateInput.options[i].value === st) {
+              stateInput.selectedIndex = i;
+              matched = true;
+              break;
+            }
+          }
+        }
+        if (!matched) stateInput.value = st;
       }
 
       if (latInput) {
@@ -92,7 +116,7 @@
       }
 
       hide();
-      // change → parent can refresh miles WITH lat/lon already set
+      // change → parent can refresh miles WITH lat/lon + state already set
       input.dispatchEvent(new Event('change', { bubbles: true }));
       if (onSelect) onSelect(s);
       setTimeout(function () { suppress = false; }, 50);

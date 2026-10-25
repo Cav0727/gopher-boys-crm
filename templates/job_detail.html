@@ -94,7 +94,7 @@
       </div>
       <div class="dl-row"><dt>Supplier</dt><dd>{{ job.supplier or '—' }}</dd></div>
       <div class="dl-row"><dt>Order #</dt><dd>{{ job.order_ref or '—' }}</dd></div>
-      <div class="dl-row"><dt>Jobsite</dt><dd>{{ job.job_address or '—' }}{% if job.city %}, {{ job.city }}{% endif %}</dd></div>
+      <div class="dl-row"><dt>Jobsite</dt><dd>{{ job.job_address or '—' }}{% if job.city %}, {{ job.city }}{% endif %}{% if job.state %} {{ job.state }}{% endif %}</dd></div>
       <div class="dl-row"><dt>Miles</dt>
         <dd>{% if job.miles is not none %}{{ '%.1f'|format(job.miles) }} mi
           {% if q_info.custom %} <span class="badge badge-custom">Custom</span>{% endif %}

@@ -87,6 +87,7 @@ def init_db() -> None:
                 order_ref TEXT,
                 job_address TEXT,
                 city TEXT,
+                state TEXT DEFAULT 'GA',
                 miles REAL,
                 quote_amount REAL,
                 wait_minutes_extra REAL DEFAULT 0,
@@ -158,6 +159,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE jobs ADD COLUMN driver_id INTEGER")
         if "materials" not in job_cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN materials TEXT")
+        if "state" not in job_cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN state TEXT DEFAULT 'GA'")
+            # Backfill nulls for existing rows
+            conn.execute("UPDATE jobs SET state = 'GA' WHERE state IS NULL OR TRIM(state) = ''")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_jobs_driver ON jobs(driver_id)"
         )

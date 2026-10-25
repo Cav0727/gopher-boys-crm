@@ -150,9 +150,18 @@
             <p class="hint" style="margin:0.25rem 0 0">Suggestions biased to Pooler / Coastal Georgia.</p>
           </div>
           <div class="form-group">
-            <label for="city">City / area</label>
+            <label for="city">City</label>
             <input id="city" name="city" value="{{ form.get('city','') }}"
-                   placeholder="e.g. Savannah, GA">
+                   placeholder="e.g. Pooler or Savannah">
+          </div>
+          <div class="form-group">
+            <label for="state">State</label>
+            <select id="state" name="state">
+              {% set st = form.get('state') or 'GA' %}
+              {% for code in ['GA', 'SC', 'FL', 'NC', 'AL', 'TN'] %}
+              <option value="{{ code }}" {% if st == code %}selected{% endif %}>{{ code }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="form-group">
             <label for="miles">Estimated one-way miles</label>
@@ -331,6 +340,7 @@
     const jobLat = (document.getElementById('job_lat').value || '').trim();
     const jobLon = (document.getElementById('job_lon').value || '').trim();
     const city = (document.getElementById('city').value || '').trim();
+    const state = (document.getElementById('state').value || 'GA').trim();
 
     status.textContent = 'Calculating miles (Pooler → supplier → jobsite)…';
     if (routeAbort) routeAbort.abort();
@@ -344,6 +354,7 @@
           supplier_address,
           jobsite,
           city,
+          state,
           jobsite_lat: jobLat || null,
           jobsite_lon: jobLon || null,
         }),
@@ -390,11 +401,12 @@
   function jobsiteReadyForMiles() {
     const jobsite = (document.getElementById('job_address').value || '').trim();
     const city = (document.getElementById('city').value || '').trim();
+    const state = (document.getElementById('state').value || '').trim();
     const lat = (document.getElementById('job_lat').value || '').trim();
     const lon = (document.getElementById('job_lon').value || '').trim();
     if (lat && lon) return true; // autocomplete selection
-    if (city.length >= 3 && jobsite.length >= 5) return true;
-    // ZIP or state in the address line itself
+    // street + city + state (state defaults to GA) is enough for accurate geocode
+    if (jobsite.length >= 5 && city.length >= 2 && state) return true;
     if (/\b\d{5}(?:-\d{4})?\b/.test(jobsite)) return true;
     if (/\b(GA|SC|Georgia|South Carolina)\b/i.test(jobsite)) return true;
     return false;
@@ -405,7 +417,7 @@
       const status = document.getElementById('route-status');
       const jobsite = (document.getElementById('job_address').value || '').trim();
       if (jobsite.length >= 3) {
-        status.textContent = 'Pick an address suggestion (or add city / ZIP) for accurate miles.';
+        status.textContent = 'Pick an address suggestion (or add city + state) for accurate miles.';
       }
       return;
     }
@@ -417,6 +429,7 @@
   document.getElementById('job_address').addEventListener('change', scheduleRouteRefreshIfReady);
   document.getElementById('city').addEventListener('input', scheduleRouteRefreshIfReady);
   document.getElementById('city').addEventListener('change', scheduleRouteRefreshIfReady);
+  document.getElementById('state').addEventListener('change', scheduleRouteRefreshIfReady);
 
   syncSupplierUI();
   if (document.getElementById('job_address').value && document.getElementById('supplier_id').value && jobsiteReadyForMiles()) {
@@ -427,6 +440,7 @@
     attachAddressAutocomplete({
       input: '#job_address',
       cityInput: '#city',
+      stateInput: '#state',
       latInput: '#job_lat',
       lonInput: '#job_lon',
       apiUrl: {{ url_for('api_address_suggest') | tojson }},

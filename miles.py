@@ -117,6 +117,59 @@ def bias_address_query(query: str) -> str:
     return f"{q}, GA, USA"
 
 
+def normalize_state(state: str | None, default: str = "GA") -> str:
+    """Return a 2-letter US state code; default GA for Coastal service area."""
+    raw = (state or "").strip()
+    if not raw:
+        return default
+    state_map = {
+        "georgia": "GA",
+        "south carolina": "SC",
+        "florida": "FL",
+        "north carolina": "NC",
+        "alabama": "AL",
+        "tennessee": "TN",
+    }
+    if len(raw) == 2:
+        return raw.upper()
+    return state_map.get(raw.lower(), raw.upper()[:2] if len(raw) >= 2 else default)
+
+
+def compose_jobsite_query(
+    street: str | None = None,
+    city: str | None = None,
+    state: str | None = None,
+) -> str:
+    """Build a geocode-friendly jobsite string: street, city, ST.
+
+    Ensures state is always present so Nominatim does not resolve bare streets
+    to NYC / other famous names.
+    """
+    street = (street or "").strip()
+    city = (city or "").strip()
+    st = normalize_state(state, default="GA")
+
+    # If city already embeds a state/ZIP (legacy "Pooler, GA 31322"), don't
+    # duplicate the state abbreviation awkwardly.
+    city_has_state = bool(_STATE_RE.search(city)) if city else False
+
+    parts: list[str] = []
+    if street:
+        parts.append(street)
+    if city:
+        # Avoid "Pooler, Pooler" if street somehow includes city
+        if not street or city.lower() not in street.lower():
+            parts.append(city)
+    joined = ", ".join(parts) if parts else ""
+    if not joined:
+        return ""
+
+    if city_has_state or _STATE_RE.search(joined):
+        # Still ensure USA bias via bias_address_query later
+        return joined
+    return f"{joined}, {st}"
+
+
 def _cache_get(query: str) -> tuple[float, float] | None:
     ensure_geocode_cache_table()
     with db() as conn:
@@ -543,6 +596,7 @@ def calc_route_miles(
     jobsite_lat: float | None = None,
     jobsite_lon: float | None = None,
     jobsite_city: str | None = None,
+    jobsite_state: str | None = None,
 ) -> dict[str, Any]:
     """
     Miles = Pooler base → supplier pickup → jobsite delivery (one-way total).
@@ -550,6 +604,8 @@ def calc_route_miles(
     When jobsite_lat/lon are provided and fall inside the Coastal GA service
     radius, those coords are used directly. Far-away coords are ignored and the
     address is re-geocoded with local bias (avoids NYC Park Ave quotes).
+
+    Always composes street + city + state (default GA) for geocode fallback.
     """
     base = (BASE_LAT, BASE_LON)
     cached_base = geocode(BASE_ADDRESS)
@@ -568,10 +624,8 @@ def calc_route_miles(
 
     jobsite = (jobsite_address or "").strip()
     city = (jobsite_city or "").strip()
-    if jobsite and city and city.lower() not in jobsite.lower():
-        jobsite_for_geo = f"{jobsite}, {city}"
-    else:
-        jobsite_for_geo = jobsite
+    state = normalize_state(jobsite_state, default="GA")
+    jobsite_for_geo = compose_jobsite_query(jobsite, city, state)
 
     j_lat = _parse_coord(jobsite_lat)
     j_lon = _parse_coord(jobsite_lon)
