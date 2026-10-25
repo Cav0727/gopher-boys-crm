@@ -474,15 +474,15 @@ textarea { min-height: 90px; resize: vertical; }
   padding: 1.75rem 1.25rem 3rem;
 }
 
-/* --- Site header: brand name MUST be large & high-contrast --- */
+/* --- Site header: solid navy + forced high-contrast wordmark --- */
 .public-hero {
-  background:
-    linear-gradient(120deg, rgba(211, 84, 0, 0.18), transparent 42%),
-    linear-gradient(160deg, var(--navy-deep) 0%, var(--navy) 45%, #123a2e 100%);
-  color: #fff;
+  width: 100%;
+  display: block;
+  background: #071628; /* solid dark navy — no light washes */
+  color: #ffffff;
   padding: 1.35rem 1.25rem 1.5rem;
-  border-bottom: 4px solid var(--orange-hot);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  border-bottom: 4px solid #e67e22;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .public-hero-inner {
@@ -497,61 +497,83 @@ textarea { min-height: 90px; resize: vertical; }
 
 .public-brand {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 1rem;
-  color: #fff !important;
+  color: #ffffff !important;
   text-decoration: none !important;
   min-width: 0;
   flex: 1 1 280px;
 }
 
-.public-brand:hover { opacity: 1; filter: brightness(1.05); }
+.public-brand:hover { opacity: 1; filter: brightness(1.06); }
 
-.public-logo {
-  height: 72px;
-  width: auto;
+/* Constrain oversized PNG; keep wordmark visible beside it */
+.public-logo,
+.public-hero img,
+.public-brand img {
+  height: 64px !important;
+  max-height: 64px !important;
+  max-width: 130px !important;
+  width: auto !important;
+  object-fit: contain !important;
+  display: block;
   border-radius: 12px;
-  background: #fff;
+  background: #ffffff;
   padding: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
 }
 
 .public-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
   min-width: 0;
+  color: #ffffff !important;
 }
 
-/* Highly visible brand wordmark — not logo-only */
-.public-brand-name {
-  display: block;
-  font-size: clamp(1.75rem, 5vw, 2.45rem);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1.05;
-  color: #ffffff;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 18px rgba(0, 0, 0, 0.35);
-  text-transform: uppercase;
+/* Pure white wordmark — never inherit link navy on dark bar */
+.public-brand-name,
+.public-hero .public-brand-name,
+.public-brand strong {
+  display: block !important;
+  font-size: clamp(1.85rem, 5.2vw, 2.55rem) !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.05 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.55);
+  text-transform: uppercase !important;
+  opacity: 1 !important;
 }
 
-.public-brand-slogan {
-  display: block;
-  font-size: clamp(0.82rem, 2.2vw, 1rem);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #ffd7a8;
-  line-height: 1.25;
+/* Light peach slogan on solid navy */
+.public-brand-slogan,
+.public-hero .public-brand-slogan,
+.public-brand .public-brand-slogan {
+  display: block !important;
+  font-size: clamp(0.85rem, 2.2vw, 1.05rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: #ffd7a8 !important;
+  -webkit-text-fill-color: #ffd7a8 !important;
+  line-height: 1.25 !important;
+  opacity: 1 !important;
 }
 
-.public-brand-meta {
-  display: block;
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
-  margin-top: 0.15rem;
+.public-brand-meta,
+.public-hero .public-brand-meta {
+  display: block !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  color: #e8eef6 !important;
+  -webkit-text-fill-color: #e8eef6 !important;
+  margin-top: 0.1rem;
+  opacity: 1 !important;
 }
 
 .public-hero-actions {
@@ -561,16 +583,17 @@ textarea { min-height: 90px; resize: vertical; }
   align-items: center;
 }
 
-/* Website nav — customer first; staff tucked aside */
+/* Website nav — high-contrast links on solid navy */
 .public-nav {
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem 1rem;
   padding: 0.7rem 1.25rem;
-  background: #0e2744;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0a1a30;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .public-nav-primary {
@@ -580,27 +603,33 @@ textarea { min-height: 90px; resize: vertical; }
   align-items: center;
 }
 
-.public-nav-primary a {
-  color: #e8f0fa;
+.public-nav-primary a,
+.public-nav a {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
   font-weight: 700;
   font-size: 0.95rem;
   text-decoration: none !important;
   padding: 0.45rem 0.85rem;
   border-radius: 999px;
+  opacity: 1 !important;
 }
 
-.public-nav-primary a:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+.public-nav-primary a:hover,
+.public-nav a:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff !important;
 }
 
-.public-nav-primary a[aria-current="page"] {
-  background: var(--orange-hot);
-  color: #fff;
+.public-nav-primary a[aria-current="page"],
+.public-nav a[aria-current="page"] {
+  background: #e67e22;
+  color: #ffffff !important;
 }
 
 .public-nav-call {
   color: #ffd7a8 !important;
+  -webkit-text-fill-color: #ffd7a8 !important;
   font-weight: 800 !important;
 }
 
@@ -609,18 +638,20 @@ textarea { min-height: 90px; resize: vertical; }
 }
 
 .public-nav-staff-link {
-  color: rgba(255, 255, 255, 0.55) !important;
+  color: #c5d4e8 !important;
+  -webkit-text-fill-color: #c5d4e8 !important;
   font-size: 0.8rem !important;
   font-weight: 600 !important;
   text-decoration: none !important;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .public-nav-staff-link:hover {
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 /* Buttons for public site */
@@ -760,6 +791,22 @@ textarea { min-height: 90px; resize: vertical; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.9rem;
+}
+
+.public-page .menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.public-page .menu-card {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #cfd9e6;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(11, 31, 58, 0.06);
 }
 
 .menu-card {
@@ -1060,8 +1107,17 @@ textarea { min-height: 90px; resize: vertical; }
 
 @media (max-width: 720px) {
   .public-hero { padding: 1.1rem 1rem 1.25rem; }
-  .public-logo { height: 58px; }
-  .public-brand-name { font-size: 1.65rem; }
+  .public-logo,
+  .public-hero img,
+  .public-brand img {
+    height: 52px !important;
+    max-height: 52px !important;
+    max-width: 110px !important;
+  }
+  .public-brand { flex-wrap: wrap; }
+  .public-brand-name,
+  .public-hero .public-brand-name { font-size: 1.7rem !important; color: #ffffff !important; }
+  .public-brand-slogan { color: #ffd7a8 !important; }
   .public-hero-actions { width: 100%; }
   .public-hero-actions .btn { flex: 1 1 auto; text-align: center; }
   .public-nav { padding: 0.55rem 0.85rem; }
@@ -1071,7 +1127,13 @@ textarea { min-height: 90px; resize: vertical; }
 }
 
 @media (max-width: 420px) {
-  .public-brand { gap: 0.75rem; }
-  .public-logo { height: 52px; }
-  .public-brand-name { letter-spacing: 0.04em; }
+  .public-brand { gap: 0.75rem; flex-wrap: wrap; }
+  .public-logo,
+  .public-hero img,
+  .public-brand img {
+    height: 48px !important;
+    max-height: 48px !important;
+    max-width: 96px !important;
+  }
+  .public-brand-name { letter-spacing: 0.04em !important; font-size: 1.55rem !important; }
 }
