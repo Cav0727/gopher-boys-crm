@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request received — Gopher Boys</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+</head>
+<body class="public-page">
+  <header class="public-hero">
+    <div class="public-hero-inner">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
+      <div>
+        <strong>GOPHER BOYS</strong>
+        <span>{{ SLOGAN }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container public-main">
+    <div class="card thanks-card">
+      <h1>Thanks — we got your request</h1>
+      <p>
+        Our team will review it and confirm price and timing before dispatch.
+        We won’t spam you or auto-send texts.
+      </p>
+      <div class="mint-box" style="margin:1.25rem 0">
+        <strong>Need it urgently?</strong>
+        <p style="margin:0.5rem 0 0;font-size:1.15rem">
+          Call <strong>{{ CONTACT_NAME }}</strong> at
+          <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+        </p>
+      </div>
+      <div class="form-actions">
+        <a class="btn btn-mint" href="{{ url_for('public_request') }}">Submit another request</a>
+        <a class="btn btn-outline" href="tel:+19127772339">Call now</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer-bar">
+    Based in <strong>{{ SERVICE_AREA }}</strong> · {{ SLOGAN }}
+  </footer>
+</body>
+</html>

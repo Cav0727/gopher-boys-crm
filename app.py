@@ -5,6 +5,9 @@ from __future__ import annotations
 import csv
 import io
 import os
+import re
+import time
+from collections import defaultdict, deque
 from functools import wraps
 from typing import Any
 
@@ -54,7 +57,7 @@ SERVICE_AREA = "Pooler, GA 31322"
 SLOGAN = "WE PICK UP. YOU KEEP BUILDING."
 
 # Public endpoints that skip login
-PUBLIC_ENDPOINTS = {"login", "health", "static"}
+PUBLIC_ENDPOINTS = {"login", "health", "static", "public_request", "public_request_thanks", "api_quote"}
 
 
 @app.context_processor
@@ -186,6 +189,205 @@ def logout():
     return redirect(url_for("login"))
 
 
+# ── Public customer request (no login) ─────────────────────────────────────
+
+# Simple in-memory rate limit: max 5 POSTs per IP per 10 minutes
+_REQUEST_HITS: dict[str, deque] = defaultdict(deque)
+_REQUEST_LIMIT = 5
+_REQUEST_WINDOW_SEC = 600
+
+
+def _client_ip() -> str:
+    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return forwarded or (request.remote_addr or "unknown")
+
+
+def _rate_limited() -> bool:
+    now = time.time()
+    ip = _client_ip()
+    q = _REQUEST_HITS[ip]
+    while q and now - q[0] > _REQUEST_WINDOW_SEC:
+        q.popleft()
+    if len(q) >= _REQUEST_LIMIT:
+        return True
+    q.append(now)
+    return False
+
+
+def _digits_only(phone: str) -> str:
+    return re.sub(r"\D", "", phone or "")
+
+
+def _find_or_create_contractor(conn, company: str, contact: str, phone: str, email: str):
+    """Match existing contractor by phone or email; else create lightly."""
+    phone_digits = _digits_only(phone)
+    email_l = (email or "").strip().lower()
+    row = None
+    if phone_digits:
+        # Compare last 10 digits so +1 / formatting still matches
+        candidates = conn.execute(
+            "SELECT * FROM contractors WHERE phone IS NOT NULL AND phone != ''"
+        ).fetchall()
+        for c in candidates:
+            if _digits_only(c["phone"])[-10:] == phone_digits[-10:]:
+                row = c
+                break
+    if row is None and email_l:
+        row = conn.execute(
+            "SELECT * FROM contractors WHERE email = ? COLLATE NOCASE",
+            (email_l,),
+        ).fetchone()
+    company_name = company or contact or "Website request"
+    if row:
+        # Light update: fill blank contact/email/phone/company if we have better data
+        updates = []
+        vals = []
+        if contact and not (row["contact_name"] or "").strip():
+            updates.append("contact_name = ?")
+            vals.append(contact)
+        if email_l and not (row["email"] or "").strip():
+            updates.append("email = ?")
+            vals.append(email_l)
+        if phone and not (row["phone"] or "").strip():
+            updates.append("phone = ?")
+            vals.append(phone)
+        if company and (row["company_name"] or "").startswith("Website"):
+            updates.append("company_name = ?")
+            vals.append(company)
+        if updates:
+            vals.append(row["id"])
+            conn.execute(
+                f"UPDATE contractors SET {', '.join(updates)} WHERE id = ?",
+                vals,
+            )
+        return row["id"]
+    now = utcnow()
+    cur = conn.execute(
+        """
+        INSERT INTO contractors
+            (company_name, contact_name, phone, email, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            company_name,
+            contact or None,
+            phone or None,
+            email_l or None,
+            "Created from website request form.",
+            now,
+        ),
+    )
+    return cur.lastrowid
+
+
+@app.route("/request", methods=["GET", "POST"])
+def public_request():
+    """Customer-facing pickup/delivery request — no login required."""
+    form = {}
+    errors = []
+    if request.method == "POST":
+        # Honeypot: bots fill "website_url"; humans leave blank
+        if _f("website_url"):
+            return redirect(url_for("public_request_thanks"))
+        if _rate_limited():
+            flash(
+                "Too many requests from your network. Please wait a few minutes "
+                "or call us at " + CONTACT_PHONE + ".",
+                "error",
+            )
+            form = as_form(request.form)
+            return render_template(
+                "public_request.html",
+                form=form,
+                errors=errors,
+                rate_table=RATE_TABLE,
+            )
+
+        company = _f("company_name")
+        contact = _f("contact_name")
+        phone = _f("phone")
+        email = _f("email")
+        supplier = _f("supplier")
+        job_address = _f("job_address")
+        city = _f("city")
+        materials = _f("materials")
+        preferred = _f("preferred_at")
+        miles = _float("miles")
+        notes = _f("notes")
+
+        if not phone:
+            errors.append("Phone number is required.")
+        if not job_address:
+            errors.append("Jobsite / delivery address is required.")
+        if not supplier:
+            errors.append("Supplier / pickup location is required.")
+        if not (company or contact):
+            errors.append("Company or contact name is required.")
+
+        if errors:
+            form = as_form(request.form)
+            return render_template(
+                "public_request.html",
+                form=form,
+                errors=errors,
+                rate_table=RATE_TABLE,
+            )
+
+        note_parts = []
+        if notes:
+            note_parts.append(notes)
+        if preferred:
+            note_parts.append(f"Preferred date/time: {preferred}")
+        job_notes = "\n".join(note_parts) if note_parts else ""
+
+        now = utcnow()
+        with db() as conn:
+            cid = _find_or_create_contractor(conn, company, contact, phone, email)
+            cur = conn.execute(
+                """
+                INSERT INTO jobs (
+                    contractor_id, supplier, order_ref, job_address, city,
+                    miles, quote_amount, wait_minutes_extra, wait_fee,
+                    extra_stops_notes, status, scheduled_at, delivered_at,
+                    notes, driver_id, materials, created_at, updated_at
+                ) VALUES (
+                    ?, ?, '', ?, ?,
+                    ?, NULL, 0, 0,
+                    '', 'request', ?, NULL,
+                    ?, NULL, ?, ?, ?
+                )
+                """,
+                (
+                    cid,
+                    supplier,
+                    job_address,
+                    city or None,
+                    miles,
+                    preferred or None,
+                    job_notes or None,
+                    materials or None,
+                    now,
+                    now,
+                ),
+            )
+            jid = cur.lastrowid
+            add_activity(conn, jid, "Submitted via website", None)
+
+        return redirect(url_for("public_request_thanks"))
+
+    return render_template(
+        "public_request.html",
+        form=form,
+        errors=errors,
+        rate_table=RATE_TABLE,
+    )
+
+
+@app.route("/request/thanks")
+def public_request_thanks():
+    return render_template("public_request_thanks.html")
+
+
 # ── Users (admin) ──────────────────────────────────────────────────────────
 
 
@@ -311,7 +513,7 @@ def dashboard():
         open_jobs = conn.execute(
             """
             SELECT COUNT(*) AS c FROM jobs
-            WHERE status IN ('lead','quoted','scheduled')
+            WHERE status IN ('request','lead','quoted','scheduled')
             """
         ).fetchone()["c"]
         revenue = conn.execute(
@@ -337,6 +539,7 @@ def dashboard():
             ORDER BY d.name
             """
         ).fetchall()
+    request_count = counts.get("request", 0)
     return render_template(
         "dashboard.html",
         counts=counts,
@@ -346,6 +549,7 @@ def dashboard():
         open_jobs=open_jobs,
         revenue=revenue,
         next_up=next_up,
+        request_count=request_count,
     )
 
 

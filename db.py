@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash
 _DEFAULT_DB = Path(__file__).resolve().parent / "data" / "gopher.db"
 DB_PATH = Path(os.environ.get("DATABASE_PATH", str(_DEFAULT_DB)))
 
-STATUSES = ("lead", "quoted", "scheduled", "delivered", "invoiced", "cancelled")
+STATUSES = ("request", "lead", "quoted", "scheduled", "delivered", "invoiced", "cancelled")
 ROLES = ("admin", "staff")
 
 

@@ -9,6 +9,16 @@
   </div>
 </div>
 
+{% if request_count %}
+<div class="request-alert">
+  <div>
+    <strong>{{ request_count }} new website request{% if request_count != 1 %}s{% endif %}</strong>
+    — customers submitted via the public form. Review and move to Lead / Quoted when ready.
+  </div>
+  <a class="btn btn-orange btn-sm" href="{{ url_for('jobs_list', status='request') }}">View web requests</a>
+</div>
+{% endif %}
+
 <div class="grid grid-4" style="margin-bottom:1.25rem">
   <div class="card stat">
     <span class="num">{{ total }}</span>

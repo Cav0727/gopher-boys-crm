@@ -58,7 +58,7 @@ On first boot (empty `users` table), two accounts are seeded with the same passw
 
 - Routes: `/login`, `/logout`, `/users` (admin), `/users/new`, `/users/<id>/edit`
 - Roles: `admin` (manage users) · `staff` (full CRM, no user admin)
-- All app routes require login except `/login`, `/static/*`, and `/health`
+- All app routes require login except `/login`, `/request`, `/request/thanks`, `/api/quote`, `/static/*`, and `/health`
 - Jobs and contractors are **shared** company-wide (not per-user silos)
 - Activity notes record which user wrote them when available
 
@@ -82,6 +82,18 @@ Admins create users at **Users → New user**.
 - Live **Send** only appears when Twilio / SMTP / Resend env vars are configured
 - **Never auto-sends** — Chris must click Send (or Mark sent) for every customer contact
 
+
+## Public customer request
+
+- **`/request`** — no-login form for contractors/customers to submit pickup & delivery requests
+- Shows flyer **rate card** + **quote calculator** (miles + optional wait)
+- On submit: creates/links a **Contractor**, creates a Job with status **`request`**, activity note “Submitted via website”
+- **Never** auto-sends SMS or email
+- Spam basics: honeypot field + per-IP rate limit (5 / 10 min)
+- Success page: thank-you + Mack’s phone **(912) 777-2339** for urgent needs
+- Login page links “Request a pickup”; dashboard shows a badge when web requests are waiting
+- Filter Jobs → **Request** to see them
+
 ## Features
 
 - Dashboard with status counts, recent jobs, quick quote widget
@@ -91,6 +103,7 @@ Admins create users at **Users → New user**.
 - Quote calculator + rate card
 - Search (name, phone, address, order #)
 - CSV export for contractors and jobs
+- Public request form: `/request` (rate card + calculator)
 - Health check: `GET /health` → `200 ok`
 
 ## Pricing (from flyer)

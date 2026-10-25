@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request a Pickup — Gopher Boys</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+</head>
+<body class="public-page">
+  <header class="public-hero">
+    <div class="public-hero-inner">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Gopher Boys">
+      <div>
+        <strong>GOPHER BOYS</strong>
+        <span>{{ SLOGAN }}</span>
+        <p class="public-tagline">Material pickup &amp; delivery · Based in {{ SERVICE_AREA }}</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="container public-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if errors %}
+      <div class="flash error">
+        {% for e in errors %}<div>{{ e }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="page-header">
+      <h1>Request a pickup</h1>
+      <p class="muted" style="margin:0;max-width:36rem">
+        Tell us where to pick up and where to deliver. We’ll confirm price and timing before we roll —
+        no spam, no auto texts.
+      </p>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:1.25rem;align-items:start">
+      <div class="card">
+        <h2>Delivery rates</h2>
+        <p class="hint">One-way road miles from Pooler, GA 31322 (supplier → jobsite).</p>
+        <div class="table-wrap">
+          <table class="rate-table">
+            <thead><tr><th>Distance</th><th>Price</th></tr></thead>
+            <tbody>
+              {% for miles, price in rate_table %}
+              <tr>
+                <td>{% if miles == 10 %}Up to 10 miles{% else %}{{ miles }} miles{% endif %}</td>
+                <td><strong>${{ price }}</strong></td>
+              </tr>
+              {% endfor %}
+              <tr><td>Over 30 miles</td><td>Custom quote</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="public-terms">
+          <li>First 10 miles = $110, then <strong>$3 per mile</strong>.</li>
+          <li>First <strong>15 minutes</strong> wait included; then <strong>$20 per started 15 min</strong>.</li>
+          <li>One pickup + one ground-level delivery. Materials ready on arrival.</li>
+          <li>Extra stops quoted separately. Price confirmed before dispatch.</li>
+        </ul>
+      </div>
+
+      <div class="card quote-card">
+        <h2>Quick quote calculator</h2>
+        <p class="hint">Estimate your price — then send the request below.</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="calc-miles">One-way miles</label>
+            <input type="number" id="calc-miles" min="0" step="0.1" placeholder="e.g. 18">
+          </div>
+          <div class="form-group">
+            <label for="calc-wait">Extra wait (min beyond 15)</label>
+            <input type="number" id="calc-wait" min="0" step="1" value="0">
+          </div>
+        </div>
+        <div id="calc-result" class="quote-result" style="display:none;margin-top:1rem">
+          <div class="price" id="calc-price"></div>
+          <div class="hint" id="calc-detail"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-mint" id="calc-btn">Calculate</button>
+          <button type="button" class="btn btn-outline" id="calc-use-miles">Use miles in form ↓</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your pickup request</h2>
+      <form method="post" id="request-form" novalidate>
+        {# Honeypot — leave empty #}
+        <div class="hp-field" aria-hidden="true">
+          <label for="website_url">Website</label>
+          <input type="text" id="website_url" name="website_url" tabindex="-1" autocomplete="off">
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="company_name">Company name</label>
+            <input id="company_name" name="company_name" value="{{ form.get('company_name','') }}"
+                   placeholder="Your company or crew">
+          </div>
+          <div class="form-group">
+            <label for="contact_name">Contact name</label>
+            <input id="contact_name" name="contact_name" value="{{ form.get('contact_name','') }}"
+                   placeholder="Who we should ask for">
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone *</label>
+            <input id="phone" name="phone" type="tel" required value="{{ form.get('phone','') }}"
+                   placeholder="(912) 555-0100" autocomplete="tel">
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" value="{{ form.get('email','') }}"
+                   placeholder="you@company.com" autocomplete="email">
+          </div>
+          <div class="form-group full">
+            <label for="supplier">Supplier / pickup location *</label>
+            <input id="supplier" name="supplier" required value="{{ form.get('supplier','') }}"
+                   placeholder="Yard name or full pickup address">
+          </div>
+          <div class="form-group full">
+            <label for="job_address">Jobsite / delivery address *</label>
+            <input id="job_address" name="job_address" required value="{{ form.get('job_address','') }}"
+                   placeholder="Street address where materials go">
+          </div>
+          <div class="form-group">
+            <label for="city">City / area</label>
+            <input id="city" name="city" value="{{ form.get('city','') }}"
+                   placeholder="e.g. Savannah, GA">
+          </div>
+          <div class="form-group">
+            <label for="miles">One-way miles (if known)</label>
+            <input id="miles" name="miles" type="number" min="0" step="0.1"
+                   value="{{ form.get('miles','') }}" placeholder="Optional">
+          </div>
+          <div class="form-group full">
+            <label for="materials">Materials description</label>
+            <textarea id="materials" name="materials"
+              placeholder="e.g. 30 sheets plywood, shingles, nails — order # if you have it">{{ form.get('materials','') }}</textarea>
+          </div>
+          <div class="form-group">
+            <label for="preferred_at">Preferred date / time</label>
+            <input id="preferred_at" name="preferred_at" value="{{ form.get('preferred_at','') }}"
+                   placeholder="e.g. Tue morning, or 2026-10-28 09:00">
+          </div>
+          <div class="form-group full">
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes"
+              placeholder="Gate codes, contact on site, anything else we should know">{{ form.get('notes','') }}</textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-mint" type="submit">Submit request</button>
+          <a class="btn btn-outline" href="tel:+19127772339">Call {{ CONTACT_PHONE }}</a>
+        </div>
+        <p class="hint" style="margin-top:1rem">
+          Urgent? Call <strong>{{ CONTACT_NAME }}</strong> at
+          <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>.
+          We won’t auto-text or spam you.
+        </p>
+      </form>
+    </div>
+  </main>
+
+  <footer class="footer-bar">
+    Based in <strong>{{ SERVICE_AREA }}</strong> ·
+    {{ CONTACT_NAME }} —
+    <a href="tel:+19127772339">{{ CONTACT_PHONE }}</a>
+    · Staff login: <a href="{{ url_for('login') }}">Sign in</a>
+  </footer>
+
+  <script>
+  // Client-side quote (same rules as pricing.py) — no login needed
+  const BASE_MILES = 10, BASE_PRICE = 110, PER_MILE = 3, MAX_AUTO = 30, WAIT_BLOCK = 15, WAIT_FEE = 20;
+
+  function calcLocal(miles, waitExtra) {
+    const m = parseFloat(miles);
+    const w = parseFloat(waitExtra) || 0;
+    if (isNaN(m) || miles === '' || miles === null) return null;
+    if (m < 0) return { custom: false, ok: false, label: 'Miles cannot be negative', detail: '' };
+    let delivery, detail, custom = false, ok = true;
+    if (m > MAX_AUTO) {
+      custom = true; ok = false;
+      delivery = null;
+      detail = m.toFixed(1) + ' mi exceeds 30 mi auto-rate — we will quote you.';
+    } else if (m <= BASE_MILES) {
+      delivery = BASE_PRICE;
+      detail = 'Up to ' + BASE_MILES + ' mi included → $' + BASE_PRICE;
+    } else {
+      const extra = m - BASE_MILES;
+      delivery = BASE_PRICE + extra * PER_MILE;
+      detail = 'First ' + BASE_MILES + ' mi = $' + BASE_PRICE + ' + ' +
+               extra.toFixed(1) + ' mi × $' + PER_MILE + ' = $' + delivery.toFixed(2);
+    }
+    let waitFee = 0, waitDetail = 'No extra wait';
+    if (w > 0) {
+      const blocks = Math.ceil(w / WAIT_BLOCK);
+      waitFee = blocks * WAIT_FEE;
+      waitDetail = w + ' min beyond included → ' + blocks + ' × $' + WAIT_FEE + ' = $' + waitFee.toFixed(2);
+    }
+    const total = (delivery != null) ? Math.round((delivery + waitFee) * 100) / 100 : null;
+    return { ok, custom, delivery, waitFee, total, detail, waitDetail };
+  }
+
+  function showCalc() {
+    const miles = document.getElementById('calc-miles').value;
+    const wait = document.getElementById('calc-wait').value || 0;
+    const box = document.getElementById('calc-result');
+    const price = document.getElementById('calc-price');
+    const detail = document.getElementById('calc-detail');
+    const r = calcLocal(miles, wait);
+    if (!r) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    if (r.custom) {
+      price.textContent = 'Custom quote';
+      detail.textContent = r.detail;
+    } else if (r.ok) {
+      price.textContent = '$' + Number(r.total).toFixed(2);
+      detail.textContent = r.detail + (r.waitFee ? ' · ' + r.waitDetail : '');
+    } else {
+      price.textContent = r.label || '—';
+      detail.textContent = r.detail || '';
+    }
+  }
+
+  document.getElementById('calc-btn').addEventListener('click', showCalc);
+  document.getElementById('calc-miles').addEventListener('change', showCalc);
+  document.getElementById('calc-wait').addEventListener('change', showCalc);
+  document.getElementById('calc-use-miles').addEventListener('click', function() {
+    const m = document.getElementById('calc-miles').value;
+    if (m !== '') {
+      document.getElementById('miles').value = m;
+      document.getElementById('miles').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.getElementById('miles').focus();
+    }
+  });
+  </script>
+</body>
+</html>
